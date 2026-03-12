@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mcqm-dashboard",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["/tmp/mcqm-serve.py"],
+      "port": 8889
+    }
+  ]
+}

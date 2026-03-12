@@ -1,0 +1,1839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CX Agent Workbench</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* SteadyMD Brand: Dark Blue #173360, Teal #26AEBC, Magenta #FF264D, Black #404040 (text only) */
+      --bg-primary: #f5f7fa;
+      --bg-secondary: #ffffff;
+      --bg-card: #ffffff;
+      --bg-card-hover: #f8fafb;
+      --bg-input: #ffffff;
+      --border: #e2e6eb;
+      --border-light: #cdd3db;
+      --text-primary: #173360;
+      --text-secondary: #404040;
+      --text-muted: #8b95a5;
+      --accent-blue: #26AEBC;
+      --accent-blue-soft: #e6f6f8;
+      --accent-green: #26AEBC;
+      --accent-green-soft: #e6f6f8;
+      --accent-red: #FF264D;
+      --accent-red-soft: #fff0f3;
+      --accent-orange: #e8850c;
+      --accent-orange-soft: #fef5e7;
+      --accent-purple: #173360;
+      --accent-purple-soft: #ebeef3;
+      --accent-cyan: #26AEBC;
+      --priority-highest: #FF264D;
+      --priority-high: #e04e6a;
+      --priority-medium: #26AEBC;
+      --priority-low: #1d96a3;
+      --priority-lowest: #8b95a5;
+      --status-open: #26AEBC;
+      --status-progress: #1d96a3;
+      --status-waiting: #e8850c;
+      --status-reopened: #FF264D;
+      --status-done: #1a8c96;
+      --font-mono: 'JetBrains Mono', monospace;
+      --font-sans: 'Open Sans', -apple-system, sans-serif;
+      --radius: 6px;
+      --radius-lg: 10px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg-primary); }
+    ::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #a8b0bc; }
+
+    .app-shell { display: flex; flex-direction: column; height: 100vh; }
+    
+    /* Header */
+    .header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      z-index: 10;
+      position: relative;
+    }
+    .header-left { display: flex; align-items: center; gap: 16px; }
+    .header-logo {
+      font-family: var(--font-mono);
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--accent-blue);
+      letter-spacing: -0.5px;
+    }
+    .header-logo span { color: var(--text-muted); font-weight: 400; }
+    .header-right { display: flex; align-items: center; gap: 16px; }
+    .header-status {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--text-secondary);
+      font-family: var(--font-mono);
+    }
+    .pulse-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent-green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    .pulse-dot.error { background: var(--accent-red); }
+    .pulse-dot.loading { background: var(--accent-orange); }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Tabs */
+    .tab-bar {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex;
+      gap: 0;
+      flex-shrink: 0;
+    }
+    .tab-btn {
+      padding: 10px 20px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+    .tab-btn:hover { color: var(--text-secondary); }
+    .tab-btn.active {
+      color: var(--accent-blue);
+      border-bottom-color: var(--accent-blue);
+    }
+    .tab-btn .badge {
+      margin-left: 6px;
+      padding: 1px 6px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+    .tab-btn .badge.red { background: #fff0f3; color: var(--accent-red); }
+    .tab-btn .badge.orange { background: #fef5e7; color: var(--accent-orange); }
+    .tab-btn .badge.blue { background: #e6f6f8; color: var(--accent-blue); }
+
+    /* Main content */
+    .main-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+    }
+
+    /* Stats row */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .stat-card.alert { border-color: var(--accent-red); border-left: 3px solid var(--accent-red); }
+    .stat-card.warn { border-color: var(--accent-orange); border-left: 3px solid var(--accent-orange); }
+    .stat-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+    .stat-value {
+      font-family: var(--font-mono);
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1.1;
+    }
+    .stat-sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+    }
+
+    /* Alert banners */
+    .alert-banner {
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .alert-banner.red {
+      background: var(--accent-red-soft);
+      border: 1px solid var(--accent-red);
+      color: var(--accent-red);
+    }
+    .alert-banner.orange {
+      background: var(--accent-orange-soft);
+      border: 1px solid var(--accent-orange);
+      color: var(--accent-orange);
+    }
+
+    /* Filters */
+    .filter-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .filter-group { display: flex; gap: 4px; }
+    .filter-btn {
+      padding: 5px 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .filter-btn:hover { border-color: var(--border-light); color: var(--text-primary); }
+    .filter-btn.active {
+      background: #e6f6f8;
+      border-color: var(--accent-blue);
+      color: #1d96a3;
+    }
+    .search-input {
+      padding: 6px 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      width: 220px;
+      outline: none;
+    }
+    .search-input:focus { border-color: var(--accent-blue); }
+    .search-input::placeholder { color: var(--text-muted); }
+
+    /* Table */
+    .ticket-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .ticket-table th {
+      text-align: left;
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .ticket-table th:hover { color: var(--text-secondary); }
+    .ticket-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      vertical-align: middle;
+    }
+    .ticket-table tr:hover td { background: #f5f7fa; }
+    .ticket-table tr.stagnant td { background: #fffbf5; }
+    .ticket-table tr.reopened td { background: #fff8f9; }
+
+    .ticket-key {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent-blue);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .ticket-key:hover { text-decoration: underline; }
+    .ticket-summary {
+      max-width: 300px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text-primary);
+    }
+
+    /* Badges */
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      white-space: nowrap;
+    }
+    .priority-highest { background: #fff0f3; color: var(--priority-highest); }
+    .priority-high { background: #fff5f7; color: var(--priority-high); }
+    .priority-medium { background: #e6f6f8; color: var(--priority-medium); }
+    .priority-low { background: #ecf8f9; color: var(--priority-low); }
+    .priority-lowest { background: #f0f2f5; color: var(--priority-lowest); }
+
+    .status-badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .status-open { background: #e6f6f8; color: var(--status-open); }
+    .status-progress { background: #e0f3f5; color: var(--status-progress); }
+    .status-waiting { background: #fef5e7; color: var(--status-waiting); }
+    .status-reopened { background: #fff0f3; color: var(--status-reopened); }
+    .status-done { background: #dff2f4; color: var(--status-done); }
+
+    .tag-whoop {
+      background: #e6f6f8;
+      color: #1d96a3;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      margin-left: 6px;
+    }
+    .tag-reopen {
+      background: #fff0f3;
+      color: var(--accent-red);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      margin-left: 6px;
+    }
+    .tag-stagnant {
+      background: #fef5e7;
+      color: var(--accent-orange);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      margin-left: 6px;
+    }
+
+    /* Age display */
+    .age-text {
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    .age-fresh { color: var(--accent-green); }
+    .age-normal { color: var(--text-secondary); }
+    .age-old { color: var(--accent-orange); }
+    .age-critical { color: var(--accent-red); }
+
+    /* Sections */
+    .section-header {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-header .count {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .section-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 24px 0;
+    }
+
+    /* Team cards */
+    .team-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .team-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .team-card-name {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    .team-card-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .team-card-stat {
+      display: flex;
+      flex-direction: column;
+    }
+    .team-card-stat-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+    .team-card-stat-value {
+      font-family: var(--font-mono);
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    /* Chart containers */
+    .chart-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 900px) { .chart-grid { grid-template-columns: 1fr; } }
+    .chart-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .chart-card-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    /* Heatmap */
+    .heatmap-grid {
+      display: grid;
+      grid-template-columns: auto repeat(24, 1fr);
+      gap: 2px;
+      font-size: 10px;
+      font-family: var(--font-mono);
+    }
+    .heatmap-cell {
+      aspect-ratio: 1;
+      border-radius: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+      font-size: 9px;
+      min-width: 20px;
+    }
+    .heatmap-label {
+      display: flex;
+      align-items: center;
+      padding-right: 4px;
+      color: var(--text-muted);
+      font-size: 10px;
+    }
+    .heatmap-hour-label {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 9px;
+      padding-bottom: 2px;
+    }
+
+    /* Bar chart (CSS) */
+    .bar-chart { display: flex; flex-direction: column; gap: 6px; }
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .bar-label {
+      font-size: 12px;
+      font-family: var(--font-mono);
+      color: var(--text-secondary);
+      min-width: 60px;
+      text-align: right;
+    }
+    .bar-track {
+      flex: 1;
+      height: 20px;
+      background: #f0f2f5;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      padding-left: 6px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: white;
+      transition: width 0.5s ease;
+    }
+
+    /* Recap */
+    .recap-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      color: var(--text-primary);
+    }
+    .copy-btn {
+      padding: 8px 16px;
+      background: var(--accent-blue);
+      border: none;
+      border-radius: var(--radius);
+      color: white;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .copy-btn:hover { background: #1d96a3; }
+    .copy-btn.copied { background: var(--accent-green); }
+
+    /* Loading */
+    .loading-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 16px;
+    }
+    .loading-spinner {
+      width: 32px; height: 32px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent-blue);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* Error */
+    .error-box {
+      background: var(--accent-red-soft);
+      border: 1px solid var(--accent-red);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      margin: 20px;
+    }
+    .error-box h3 { color: var(--accent-red); margin-bottom: 8px; }
+    .error-box p { color: var(--text-secondary); font-size: 13px; }
+    .error-box code {
+      display: block;
+      margin-top: 8px;
+      padding: 8px;
+      background: #fff8f9;
+      border-radius: var(--radius);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--accent-red);
+    }
+
+    /* Demo banner */
+    .demo-banner {
+      background: var(--accent-purple-soft);
+      border: 1px solid var(--accent-purple);
+      border-radius: var(--radius);
+      padding: 10px 16px;
+      margin-bottom: 16px;
+      font-size: 12px;
+      color: var(--accent-purple);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Refresh button */
+    .refresh-btn {
+      padding: 4px 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text-secondary);
+      font-size: 12px;
+      cursor: pointer;
+      font-family: var(--font-mono);
+    }
+    .refresh-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+
+    /* Tooltip */
+    .tooltip-container { position: relative; }
+    .tooltip-container .tooltip-text {
+      display: none;
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 4px 8px;
+      background: #173360;
+      border: 1px solid #173360;
+      border-radius: 4px;
+      font-size: 11px;
+      white-space: nowrap;
+      z-index: 100;
+      color: #ffffff;
+      font-family: var(--font-mono);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .tooltip-container:hover .tooltip-text { display: block; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useMemo, useCallback, useRef } = React;
+
+// ── Config ───────────────────────────────────────────────────
+const API_BASE = '/api/jira-proxy';
+const REFRESH_INTERVAL = 60000; // 60 seconds
+const JIRA_DOMAIN = 'steadymd.atlassian.net';
+
+const PROJECT_LABELS = {
+  PSS: 'Partner Support Services',
+  MCQM: 'Patient Support Services',
+  FHPS: 'FHPS',
+  OAC: 'OAC',
+};
+
+// ── Helpers ──────────────────────────────────────────────────
+function formatAge(hours) {
+  if (hours === null || hours === undefined) return '-';
+  if (hours < 1) return `${Math.round(hours * 60)}m`;
+  if (hours < 24) return `${Math.round(hours)}h`;
+  const days = Math.floor(hours / 24);
+  const remainHrs = Math.round(hours % 24);
+  return `${days}d ${remainHrs}h`;
+}
+
+function ageClass(hours) {
+  if (hours === null) return 'age-normal';
+  if (hours < 4) return 'age-fresh';
+  if (hours < 24) return 'age-normal';
+  if (hours < 72) return 'age-old';
+  return 'age-critical';
+}
+
+function priorityClass(priority) {
+  const p = (priority || '').toLowerCase();
+  if (p === 'highest' || p === 'critical') return 'priority-highest';
+  if (p === 'high') return 'priority-high';
+  if (p === 'medium' || p === 'normal') return 'priority-medium';
+  if (p === 'low') return 'priority-low';
+  return 'priority-lowest';
+}
+
+function statusClass(status) {
+  const s = (status || '').toLowerCase();
+  if (s.includes('reopen')) return 'status-reopened';
+  if (s.includes('progress') || s.includes('review')) return 'status-progress';
+  if (s.includes('waiting') || s.includes('pending') || s.includes('hold')) return 'status-waiting';
+  if (s.includes('done') || s.includes('closed') || s.includes('resolved')) return 'status-done';
+  return 'status-open';
+}
+
+function prioritySortOrder(priority) {
+  const p = (priority || '').toLowerCase();
+  if (p === 'highest' || p === 'critical') return 1;
+  if (p === 'high') return 2;
+  if (p === 'medium' || p === 'normal') return 3;
+  if (p === 'low') return 4;
+  return 5;
+}
+
+function formatTimeCT(date) {
+  if (!date) return '-';
+  return new Date(date).toLocaleString('en-US', {
+    timeZone: 'America/Chicago',
+    month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true,
+  }) + ' CT';
+}
+
+function formatDateCT(date) {
+  if (!date) return '-';
+  return new Date(date).toLocaleDateString('en-US', {
+    timeZone: 'America/Chicago',
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
+}
+
+// ── Demo Data Generator ──────────────────────────────────────
+function generateDemoData() {
+  const statuses = ['Open', 'In Progress', 'Waiting for Support', 'Reopened', 'Under Review'];
+  const priorities = ['Highest', 'High', 'Medium', 'Low', 'Lowest'];
+  const types = ['Service Request', 'Incident', 'Task', 'Bug', 'Question'];
+  const assignees = ['Zoie', 'Sarah M.', 'Carlos R.', 'Unassigned'];
+  const partners = ['Whoop', 'BetterHelp', 'Hims & Hers', 'Noom', 'Calibrate', 'Found', 'Ro', 'Thirty Madison'];
+  const projects = ['PSS', 'MCQM', 'FHPS', 'OAC'];
+  const projectWeights = [0.4, 0.35, 0.15, 0.1];
+
+  const tickets = [];
+  const now = Date.now();
+
+  for (let i = 0; i < 87; i++) {
+    const projRoll = Math.random();
+    let projIdx = 0;
+    let cumWeight = 0;
+    for (let j = 0; j < projectWeights.length; j++) {
+      cumWeight += projectWeights[j];
+      if (projRoll < cumWeight) { projIdx = j; break; }
+    }
+    const projectKey = projects[projIdx];
+    const num = 1000 + i;
+    const key = `${projectKey}-${num}`;
+    const hoursAgo = Math.random() * 168;
+    const created = new Date(now - hoursAgo * 3600000).toISOString();
+    const updated = new Date(now - Math.random() * hoursAgo * 3600000).toISOString();
+    const hoursSinceUpdate = (now - new Date(updated).getTime()) / 3600000;
+    const status = statuses[Math.floor(Math.random() * statuses.length)];
+    const priority = priorities[Math.floor(Math.random() * priorities.length)];
+    const partner = projectKey === 'PSS' ? partners[Math.floor(Math.random() * partners.length)] : null;
+    const isWhoop = partner === 'Whoop';
+    const assignee = assignees[Math.floor(Math.random() * assignees.length)];
+    const reopenCount = status === 'Reopened' ? Math.floor(Math.random() * 3) + 1 : Math.random() < 0.1 ? 1 : 0;
+    const commentCount = Math.floor(Math.random() * 12);
+
+    tickets.push({
+      key,
+      projectKey,
+      summary: `${isWhoop ? '[Whoop] ' : partner ? `[${partner}] ` : ''}Sample ticket ${key} - ${types[Math.floor(Math.random() * types.length)].toLowerCase()} request`,
+      status,
+      statusCategory: status === 'Reopened' || status === 'Open' ? 'To Do' : status === 'In Progress' ? 'In Progress' : 'To Do',
+      priority,
+      priorityId: String(priorities.indexOf(priority) + 1),
+      issueType: types[Math.floor(Math.random() * types.length)],
+      assignee,
+      assigneeEmail: '',
+      reporter: 'Reporter',
+      created,
+      updated,
+      resolved: null,
+      labels: isWhoop ? ['Whoop'] : [],
+      components: [],
+      isWhoop,
+      commentCount,
+      internalComments: Math.floor(commentCount * 0.6),
+      externalComments: Math.ceil(commentCount * 0.4),
+      lastCommentTime: updated,
+      lastCommentAuthor: assignee,
+      lastCommentIsInternal: Math.random() > 0.5,
+      waitingForResponse: Math.random() > 0.6,
+      reopenCount,
+      lastReopened: reopenCount > 0 ? updated : null,
+      assigneeChanges: Math.floor(Math.random() * 3),
+      hoursSinceUpdate: Math.round(hoursSinceUpdate * 10) / 10,
+      hoursSinceActivity: Math.round(hoursSinceUpdate * 10) / 10,
+      cycleTimeHours: null,
+      isStagnant: hoursSinceUpdate > 24,
+      isReopened: reopenCount > 0,
+      jiraUrl: `https://${JIRA_DOMAIN}/browse/${key}`,
+    });
+  }
+  return tickets;
+}
+
+// ── App Component ────────────────────────────────────────────
+function App() {
+  const [activeTab, setActiveTab] = useState('queue');
+  const [tickets, setTickets] = useState([]);
+  const [resolvedTickets, setResolvedTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [lastRefresh, setLastRefresh] = useState(null);
+  const [isDemo, setIsDemo] = useState(false);
+
+  // Filters
+  const [projectFilter, setProjectFilter] = useState('ALL');
+  const [assigneeFilter, setAssigneeFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortField, setSortField] = useState('priority');
+  const [sortDir, setSortDir] = useState('asc');
+  const [showWhoop, setShowWhoop] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/queue`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setTickets(data);
+      setIsDemo(false);
+      setError(null);
+      setLastRefresh(new Date());
+    } catch (err) {
+      console.warn('Live fetch failed, using demo data:', err.message);
+      setTickets(generateDemoData());
+      setIsDemo(true);
+      setError(err.message);
+      setLastRefresh(new Date());
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, REFRESH_INTERVAL);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  // Derived data
+  const stats = useMemo(() => {
+    const open = tickets.length;
+    const reopened = tickets.filter(t => t.isReopened).length;
+    const stagnant = tickets.filter(t => t.isStagnant).length;
+    const waiting = tickets.filter(t => t.waitingForResponse).length;
+    const byProject = {};
+    const byAssignee = {};
+    tickets.forEach(t => {
+      byProject[t.projectKey] = (byProject[t.projectKey] || 0) + 1;
+      byAssignee[t.assignee] = (byAssignee[t.assignee] || 0) + 1;
+    });
+    const whoop = tickets.filter(t => t.isWhoop).length;
+    return { open, reopened, stagnant, waiting, byProject, byAssignee, whoop };
+  }, [tickets]);
+
+  // Filtered + sorted tickets
+  const filteredTickets = useMemo(() => {
+    let filtered = [...tickets];
+    if (projectFilter !== 'ALL') {
+      filtered = filtered.filter(t => t.projectKey === projectFilter);
+    }
+    if (showWhoop) {
+      filtered = filtered.filter(t => t.isWhoop);
+    }
+    if (assigneeFilter !== 'ALL') {
+      filtered = filtered.filter(t => t.assignee === assigneeFilter);
+    }
+    if (statusFilter !== 'ALL') {
+      if (statusFilter === 'REOPENED') {
+        filtered = filtered.filter(t => t.isReopened);
+      } else if (statusFilter === 'STAGNANT') {
+        filtered = filtered.filter(t => t.isStagnant);
+      } else if (statusFilter === 'WAITING') {
+        filtered = filtered.filter(t => t.waitingForResponse);
+      } else {
+        filtered = filtered.filter(t => t.status === statusFilter);
+      }
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(t =>
+        t.key.toLowerCase().includes(q) ||
+        t.summary.toLowerCase().includes(q) ||
+        t.assignee.toLowerCase().includes(q)
+      );
+    }
+    filtered.sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case 'priority':
+          cmp = prioritySortOrder(a.priority) - prioritySortOrder(b.priority);
+          if (cmp === 0) cmp = new Date(a.created) - new Date(b.created);
+          break;
+        case 'created':
+          cmp = new Date(a.created) - new Date(b.created);
+          break;
+        case 'updated':
+          cmp = new Date(a.updated) - new Date(b.updated);
+          break;
+        case 'age':
+          cmp = (b.hoursSinceUpdate || 0) - (a.hoursSinceUpdate || 0);
+          break;
+        case 'key':
+          cmp = a.key.localeCompare(b.key);
+          break;
+        case 'assignee':
+          cmp = a.assignee.localeCompare(b.assignee);
+          break;
+        default:
+          cmp = prioritySortOrder(a.priority) - prioritySortOrder(b.priority);
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return filtered;
+  }, [tickets, projectFilter, assigneeFilter, statusFilter, searchQuery, sortField, sortDir, showWhoop]);
+
+  const uniqueAssignees = useMemo(() => {
+    return [...new Set(tickets.map(t => t.assignee))].sort();
+  }, [tickets]);
+
+  const uniqueStatuses = useMemo(() => {
+    return [...new Set(tickets.map(t => t.status))].sort();
+  }, [tickets]);
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
+  const sortIndicator = (field) => {
+    if (sortField !== field) return '';
+    return sortDir === 'asc' ? ' ↑' : ' ↓';
+  };
+
+  if (loading) {
+    return (
+      <div className="app-shell">
+        <div className="loading-screen">
+          <div className="loading-spinner" />
+          <div className="loading-text">Connecting to Jira...</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="app-shell">
+      {/* Header */}
+      <header className="header">
+        <div className="header-left">
+          <div className="header-logo">
+            CX WORKBENCH <span>v1.0</span>
+          </div>
+        </div>
+        <div className="header-right">
+          <button className="refresh-btn" onClick={fetchData}>Refresh</button>
+          <div className="header-status">
+            <div className={`pulse-dot ${isDemo ? 'error' : ''}`} />
+            {isDemo ? 'DEMO MODE' : 'LIVE'}
+          </div>
+          <div className="header-status" style={{color: 'var(--text-muted)'}}>
+            {lastRefresh ? formatTimeCT(lastRefresh) : '-'}
+          </div>
+        </div>
+      </header>
+
+      {/* Tabs */}
+      <nav className="tab-bar">
+        <button className={`tab-btn ${activeTab === 'queue' ? 'active' : ''}`} onClick={() => setActiveTab('queue')}>
+          Queue
+          <span className="badge blue">{tickets.length}</span>
+        </button>
+        <button className={`tab-btn ${activeTab === 'alerts' ? 'active' : ''}`} onClick={() => setActiveTab('alerts')}>
+          Alerts
+          {(stats.reopened > 0 || stats.stagnant > 0) && (
+            <span className="badge red">{stats.reopened + stats.stagnant}</span>
+          )}
+        </button>
+        <button className={`tab-btn ${activeTab === 'team' ? 'active' : ''}`} onClick={() => setActiveTab('team')}>
+          Team
+        </button>
+        <button className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => setActiveTab('analytics')}>
+          Analytics
+        </button>
+        <button className={`tab-btn ${activeTab === 'recap' ? 'active' : ''}`} onClick={() => setActiveTab('recap')}>
+          Recap
+        </button>
+      </nav>
+
+      {/* Content */}
+      <div className="main-content">
+        {isDemo && (
+          <div className="demo-banner">
+            ⚡ Running in demo mode. Deploy to Netlify with your Jira API token to see live data.
+            {error && <span style={{marginLeft: 8, opacity: 0.7}}>({error})</span>}
+          </div>
+        )}
+
+        {activeTab === 'queue' && (
+          <QueueView
+            tickets={filteredTickets}
+            stats={stats}
+            projectFilter={projectFilter}
+            setProjectFilter={setProjectFilter}
+            assigneeFilter={assigneeFilter}
+            setAssigneeFilter={setAssigneeFilter}
+            statusFilter={statusFilter}
+            setStatusFilter={setStatusFilter}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            showWhoop={showWhoop}
+            setShowWhoop={setShowWhoop}
+            uniqueAssignees={uniqueAssignees}
+            uniqueStatuses={uniqueStatuses}
+            handleSort={handleSort}
+            sortIndicator={sortIndicator}
+          />
+        )}
+        {activeTab === 'alerts' && <AlertsView tickets={tickets} stats={stats} />}
+        {activeTab === 'team' && <TeamView tickets={tickets} stats={stats} />}
+        {activeTab === 'analytics' && <AnalyticsView tickets={tickets} stats={stats} />}
+        {activeTab === 'recap' && <RecapView tickets={tickets} stats={stats} />}
+      </div>
+    </div>
+  );
+}
+
+// ── Queue View ───────────────────────────────────────────────
+function QueueView({
+  tickets, stats, projectFilter, setProjectFilter,
+  assigneeFilter, setAssigneeFilter, statusFilter, setStatusFilter,
+  searchQuery, setSearchQuery, showWhoop, setShowWhoop,
+  uniqueAssignees, uniqueStatuses, handleSort, sortIndicator,
+}) {
+  return (
+    <div>
+      {/* Stats Row */}
+      <div className="stats-row">
+        <div className="stat-card">
+          <div className="stat-label">Open Backlog</div>
+          <div className="stat-value" style={{color: 'var(--accent-blue)'}}>{stats.open}</div>
+          <div className="stat-sub">across all projects</div>
+        </div>
+        <div className={`stat-card ${stats.reopened > 0 ? 'alert' : ''}`}>
+          <div className="stat-label">Reopened</div>
+          <div className="stat-value" style={{color: stats.reopened > 0 ? 'var(--accent-red)' : 'var(--text-primary)'}}>{stats.reopened}</div>
+          <div className="stat-sub">need attention</div>
+        </div>
+        <div className={`stat-card ${stats.stagnant > 5 ? 'warn' : ''}`}>
+          <div className="stat-label">Stagnant (24h+)</div>
+          <div className="stat-value" style={{color: stats.stagnant > 0 ? 'var(--accent-orange)' : 'var(--text-primary)'}}>{stats.stagnant}</div>
+          <div className="stat-sub">no update 24h+</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Waiting for Response</div>
+          <div className="stat-value" style={{color: 'var(--accent-purple)'}}>{stats.waiting}</div>
+          <div className="stat-sub">ball in their court</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Whoop (PSS)</div>
+          <div className="stat-value" style={{color: 'var(--accent-cyan)'}}>{stats.whoop}</div>
+          <div className="stat-sub">active Whoop tickets</div>
+        </div>
+      </div>
+
+      {/* Reopened banner */}
+      {stats.reopened > 0 && (
+        <div className="alert-banner red">
+          🔴 {stats.reopened} reopened ticket{stats.reopened > 1 ? 's' : ''} in the queue. These need priority attention.
+          <button className="filter-btn" style={{marginLeft: 'auto', borderColor: 'var(--accent-red)', color: 'var(--accent-red)'}}
+            onClick={() => setStatusFilter(statusFilter === 'REOPENED' ? 'ALL' : 'REOPENED')}>
+            {statusFilter === 'REOPENED' ? 'Show All' : 'Show Reopened'}
+          </button>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="filter-row">
+        <div className="filter-group">
+          {['ALL', 'PSS', 'MCQM', 'FHPS', 'OAC'].map(p => (
+            <button key={p}
+              className={`filter-btn ${projectFilter === p ? 'active' : ''}`}
+              onClick={() => { setProjectFilter(p); setShowWhoop(false); }}>
+              {p === 'ALL' ? 'All Projects' : p}
+              {p !== 'ALL' && stats.byProject[p] ? ` (${stats.byProject[p]})` : ''}
+            </button>
+          ))}
+          <button
+            className={`filter-btn ${showWhoop ? 'active' : ''}`}
+            style={showWhoop ? {background: '#e6f6f8', borderColor: 'var(--accent-cyan)', color: '#1d96a3'} : {}}
+            onClick={() => { setShowWhoop(!showWhoop); if (!showWhoop) setProjectFilter('ALL'); }}>
+            Whoop ({stats.whoop})
+          </button>
+        </div>
+
+        <select
+          className="search-input"
+          style={{width: 'auto', cursor: 'pointer'}}
+          value={assigneeFilter}
+          onChange={e => setAssigneeFilter(e.target.value)}>
+          <option value="ALL">All Assignees</option>
+          {uniqueAssignees.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
+
+        <select
+          className="search-input"
+          style={{width: 'auto', cursor: 'pointer'}}
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}>
+          <option value="ALL">All Statuses</option>
+          <option value="REOPENED">⚠ Reopened</option>
+          <option value="STAGNANT">⏰ Stagnant</option>
+          <option value="WAITING">⏳ Waiting</option>
+          {uniqueStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+
+        <input
+          className="search-input"
+          placeholder="Search key, summary, assignee..."
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+        />
+        <span style={{fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)'}}>
+          {tickets.length} ticket{tickets.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+
+      {/* Ticket Table */}
+      <table className="ticket-table">
+        <thead>
+          <tr>
+            <th onClick={() => handleSort('priority')}>Priority{sortIndicator('priority')}</th>
+            <th onClick={() => handleSort('key')}>Key{sortIndicator('key')}</th>
+            <th>Summary</th>
+            <th>Status</th>
+            <th onClick={() => handleSort('assignee')}>Assignee{sortIndicator('assignee')}</th>
+            <th onClick={() => handleSort('created')}>Created{sortIndicator('created')}</th>
+            <th onClick={() => handleSort('age')}>Age{sortIndicator('age')}</th>
+            <th>Flags</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tickets.map(t => (
+            <tr key={t.key}
+              className={`${t.isStagnant ? 'stagnant' : ''} ${t.isReopened ? 'reopened' : ''}`}>
+              <td>
+                <span className={`badge-pill ${priorityClass(t.priority)}`}>{t.priority}</span>
+              </td>
+              <td>
+                <a href={t.jiraUrl} target="_blank" rel="noopener noreferrer" className="ticket-key">
+                  {t.key}
+                </a>
+              </td>
+              <td>
+                <div className="ticket-summary">
+                  {t.summary}
+                </div>
+              </td>
+              <td>
+                <span className={`status-badge ${statusClass(t.status)}`}>{t.status}</span>
+              </td>
+              <td style={{fontSize: 12, color: t.assignee === 'Unassigned' ? 'var(--accent-orange)' : 'var(--text-secondary)'}}>
+                {t.assignee}
+              </td>
+              <td style={{fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap'}}>
+                {formatTimeCT(t.created)}
+              </td>
+              <td>
+                <span className={`age-text ${ageClass(t.hoursSinceUpdate)}`}>
+                  {formatAge(t.hoursSinceUpdate)}
+                </span>
+              </td>
+              <td style={{whiteSpace: 'nowrap'}}>
+                {t.isWhoop && <span className="tag-whoop">WHOOP</span>}
+                {t.isReopened && <span className="tag-reopen">REOPEN x{t.reopenCount}</span>}
+                {t.isStagnant && <span className="tag-stagnant">STAGNANT</span>}
+                {t.waitingForResponse && (
+                  <span style={{fontSize: 10, color: 'var(--accent-purple)', marginLeft: 4}}>⏳</span>
+                )}
+              </td>
+            </tr>
+          ))}
+          {tickets.length === 0 && (
+            <tr>
+              <td colSpan={8} style={{textAlign: 'center', padding: 40, color: 'var(--text-muted)'}}>
+                No tickets match the current filters.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Alerts View ──────────────────────────────────────────────
+function AlertsView({ tickets, stats }) {
+  const reopened = tickets.filter(t => t.isReopened)
+    .sort((a, b) => (b.reopenCount || 0) - (a.reopenCount || 0));
+  const stagnant = tickets.filter(t => t.isStagnant)
+    .sort((a, b) => (b.hoursSinceUpdate || 0) - (a.hoursSinceUpdate || 0));
+  const unassigned = tickets.filter(t => t.assignee === 'Unassigned');
+  const highPriStagnant = stagnant.filter(t => ['Highest', 'High', 'Critical'].includes(t.priority));
+
+  return (
+    <div>
+      <div className="stats-row">
+        <div className={`stat-card ${reopened.length > 0 ? 'alert' : ''}`}>
+          <div className="stat-label">Reopened Tickets</div>
+          <div className="stat-value" style={{color: 'var(--accent-red)'}}>{reopened.length}</div>
+        </div>
+        <div className={`stat-card ${stagnant.length > 5 ? 'warn' : ''}`}>
+          <div className="stat-label">Stagnant (24h+)</div>
+          <div className="stat-value" style={{color: 'var(--accent-orange)'}}>{stagnant.length}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Unassigned</div>
+          <div className="stat-value" style={{color: 'var(--accent-purple)'}}>{unassigned.length}</div>
+        </div>
+        <div className={`stat-card ${highPriStagnant.length > 0 ? 'alert' : ''}`}>
+          <div className="stat-label">High Priority + Stagnant</div>
+          <div className="stat-value" style={{color: 'var(--accent-red)'}}>{highPriStagnant.length}</div>
+        </div>
+      </div>
+
+      {/* Reopened Section */}
+      <div className="section-header">
+        🔴 Reopened Tickets <span className="count">({reopened.length})</span>
+      </div>
+      {reopened.length === 0 ? (
+        <p style={{color: 'var(--text-muted)', marginBottom: 20}}>No reopened tickets. Clean slate.</p>
+      ) : (
+        <table className="ticket-table" style={{marginBottom: 24}}>
+          <thead>
+            <tr>
+              <th>Key</th><th>Summary</th><th>Reopen Count</th><th>Assignee</th><th>Priority</th><th>Age</th>
+            </tr>
+          </thead>
+          <tbody>
+            {reopened.map(t => (
+              <tr key={t.key} className="reopened">
+                <td><a href={t.jiraUrl} target="_blank" className="ticket-key">{t.key}</a></td>
+                <td><div className="ticket-summary">{t.summary}</div></td>
+                <td><span className="tag-reopen">x{t.reopenCount}</span></td>
+                <td style={{fontSize: 12}}>{t.assignee}</td>
+                <td><span className={`badge-pill ${priorityClass(t.priority)}`}>{t.priority}</span></td>
+                <td><span className={`age-text ${ageClass(t.hoursSinceUpdate)}`}>{formatAge(t.hoursSinceUpdate)}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <div className="section-divider" />
+
+      {/* Stagnant Section */}
+      <div className="section-header">
+        ⏰ Stagnant Tickets (No Update 24h+) <span className="count">({stagnant.length})</span>
+      </div>
+      {stagnant.length === 0 ? (
+        <p style={{color: 'var(--text-muted)', marginBottom: 20}}>All tickets have been touched within 24 hours.</p>
+      ) : (
+        <table className="ticket-table" style={{marginBottom: 24}}>
+          <thead>
+            <tr>
+              <th>Key</th><th>Summary</th><th>Last Update</th><th>Assignee</th><th>Priority</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stagnant.slice(0, 25).map(t => (
+              <tr key={t.key} className="stagnant">
+                <td><a href={t.jiraUrl} target="_blank" className="ticket-key">{t.key}</a></td>
+                <td><div className="ticket-summary">{t.summary}</div></td>
+                <td><span className={`age-text ${ageClass(t.hoursSinceUpdate)}`}>{formatAge(t.hoursSinceUpdate)} ago</span></td>
+                <td style={{fontSize: 12}}>{t.assignee}</td>
+                <td><span className={`badge-pill ${priorityClass(t.priority)}`}>{t.priority}</span></td>
+                <td><span className={`status-badge ${statusClass(t.status)}`}>{t.status}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <div className="section-divider" />
+
+      {/* Unassigned */}
+      <div className="section-header">
+        👤 Unassigned Tickets <span className="count">({unassigned.length})</span>
+      </div>
+      {unassigned.length === 0 ? (
+        <p style={{color: 'var(--text-muted)'}}>All tickets are assigned.</p>
+      ) : (
+        <table className="ticket-table">
+          <thead>
+            <tr><th>Key</th><th>Summary</th><th>Priority</th><th>Status</th><th>Age</th></tr>
+          </thead>
+          <tbody>
+            {unassigned.map(t => (
+              <tr key={t.key}>
+                <td><a href={t.jiraUrl} target="_blank" className="ticket-key">{t.key}</a></td>
+                <td><div className="ticket-summary">{t.summary}</div></td>
+                <td><span className={`badge-pill ${priorityClass(t.priority)}`}>{t.priority}</span></td>
+                <td><span className={`status-badge ${statusClass(t.status)}`}>{t.status}</span></td>
+                <td><span className={`age-text ${ageClass(t.hoursSinceUpdate)}`}>{formatAge(t.hoursSinceUpdate)}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+// ── Team View ────────────────────────────────────────────────
+function TeamView({ tickets, stats }) {
+  const teamData = useMemo(() => {
+    const map = {};
+    tickets.forEach(t => {
+      const name = t.assignee;
+      if (!map[name]) {
+        map[name] = { name, open: 0, reopened: 0, stagnant: 0, waiting: 0, totalComments: 0, byProject: {} };
+      }
+      map[name].open++;
+      if (t.isReopened) map[name].reopened++;
+      if (t.isStagnant) map[name].stagnant++;
+      if (t.waitingForResponse) map[name].waiting++;
+      map[name].totalComments += t.commentCount || 0;
+      map[name].byProject[t.projectKey] = (map[name].byProject[t.projectKey] || 0) + 1;
+    });
+    return Object.values(map).sort((a, b) => b.open - a.open);
+  }, [tickets]);
+
+  const maxOpen = Math.max(...teamData.map(t => t.open), 1);
+
+  return (
+    <div>
+      <div className="section-header">Team Workload <span className="count">({teamData.length} members)</span></div>
+      
+      {/* Workload bar chart */}
+      <div className="chart-card" style={{marginBottom: 20}}>
+        <div className="chart-card-title">Tickets by Assignee</div>
+        <div className="bar-chart">
+          {teamData.map(m => (
+            <div key={m.name} className="bar-row">
+              <div className="bar-label" style={{minWidth: 100}}>{m.name}</div>
+              <div className="bar-track">
+                <div className="bar-fill" style={{
+                  width: `${(m.open / maxOpen) * 100}%`,
+                  background: m.name === 'Unassigned' ? 'var(--accent-orange)' : 'var(--accent-blue)',
+                }}>
+                  {m.open}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Team cards */}
+      <div className="team-grid">
+        {teamData.filter(m => m.name !== 'Unassigned').map(m => (
+          <div key={m.name} className="team-card">
+            <div className="team-card-name">{m.name}</div>
+            <div className="team-card-stats">
+              <div className="team-card-stat">
+                <div className="team-card-stat-label">Open</div>
+                <div className="team-card-stat-value" style={{color: 'var(--accent-blue)'}}>{m.open}</div>
+              </div>
+              <div className="team-card-stat">
+                <div className="team-card-stat-label">Reopened</div>
+                <div className="team-card-stat-value" style={{color: m.reopened > 0 ? 'var(--accent-red)' : 'var(--text-muted)'}}>{m.reopened}</div>
+              </div>
+              <div className="team-card-stat">
+                <div className="team-card-stat-label">Stagnant</div>
+                <div className="team-card-stat-value" style={{color: m.stagnant > 0 ? 'var(--accent-orange)' : 'var(--text-muted)'}}>{m.stagnant}</div>
+              </div>
+              <div className="team-card-stat">
+                <div className="team-card-stat-label">Waiting</div>
+                <div className="team-card-stat-value" style={{color: 'var(--accent-purple)'}}>{m.waiting}</div>
+              </div>
+            </div>
+            <div style={{marginTop: 10, fontSize: 11, color: 'var(--text-muted)'}}>
+              {Object.entries(m.byProject).map(([proj, count]) => (
+                <span key={proj} style={{marginRight: 8, fontFamily: 'var(--font-mono)'}}>
+                  {proj}: {count}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Concentration metrics */}
+      <div className="chart-card">
+        <div className="chart-card-title">Workload Concentration</div>
+        {(() => {
+          const assigned = teamData.filter(m => m.name !== 'Unassigned');
+          const total = assigned.reduce((s, m) => s + m.open, 0);
+          if (total === 0) return <p style={{color: 'var(--text-muted)'}}>No assigned tickets.</p>;
+          const top1 = assigned[0] ? Math.round(assigned[0].open / total * 100) : 0;
+          const top2 = assigned.slice(0, 2).reduce((s, m) => s + m.open, 0);
+          const top3 = assigned.slice(0, 3).reduce((s, m) => s + m.open, 0);
+          return (
+            <div style={{display: 'flex', gap: 32}}>
+              <div>
+                <div style={{fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase'}}>Top 1 Assignee</div>
+                <div style={{fontFamily: 'var(--font-mono)', fontSize: 24, fontWeight: 700}}>{top1}%</div>
+                <div style={{fontSize: 12, color: 'var(--text-secondary)'}}>{assigned[0]?.name}</div>
+              </div>
+              <div>
+                <div style={{fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase'}}>Top 2 Assignees</div>
+                <div style={{fontFamily: 'var(--font-mono)', fontSize: 24, fontWeight: 700}}>{Math.round(top2 / total * 100)}%</div>
+              </div>
+              <div>
+                <div style={{fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase'}}>Top 3 Assignees</div>
+                <div style={{fontFamily: 'var(--font-mono)', fontSize: 24, fontWeight: 700}}>{Math.round(top3 / total * 100)}%</div>
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+    </div>
+  );
+}
+
+// ── Analytics View ───────────────────────────────────────────
+function AnalyticsView({ tickets, stats }) {
+  // Project breakdown
+  const projectData = useMemo(() => {
+    const counts = {};
+    tickets.forEach(t => {
+      counts[t.projectKey] = (counts[t.projectKey] || 0) + 1;
+    });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  }, [tickets]);
+
+  const maxProject = Math.max(...projectData.map(([, c]) => c), 1);
+
+  // Issue type breakdown
+  const typeData = useMemo(() => {
+    const counts = {};
+    tickets.forEach(t => {
+      counts[t.issueType] = (counts[t.issueType] || 0) + 1;
+    });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  }, [tickets]);
+
+  const maxType = Math.max(...typeData.map(([, c]) => c), 1);
+
+  // Priority breakdown
+  const priorityData = useMemo(() => {
+    const counts = {};
+    tickets.forEach(t => {
+      counts[t.priority] = (counts[t.priority] || 0) + 1;
+    });
+    const order = ['Highest', 'High', 'Medium', 'Low', 'Lowest'];
+    return order.filter(p => counts[p]).map(p => [p, counts[p]]);
+  }, [tickets]);
+
+  const maxPriority = Math.max(...priorityData.map(([, c]) => c), 1);
+
+  // Status breakdown
+  const statusData = useMemo(() => {
+    const counts = {};
+    tickets.forEach(t => {
+      counts[t.status] = (counts[t.status] || 0) + 1;
+    });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  }, [tickets]);
+
+  const maxStatus = Math.max(...statusData.map(([, c]) => c), 1);
+
+  // Day of week distribution (from created date)
+  const dayOfWeekData = useMemo(() => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const counts = Array(7).fill(0);
+    tickets.forEach(t => {
+      if (t.created) {
+        const d = new Date(t.created);
+        counts[d.getDay()]++;
+      }
+    });
+    return days.map((day, i) => [day, counts[i]]);
+  }, [tickets]);
+
+  const maxDay = Math.max(...dayOfWeekData.map(([, c]) => c), 1);
+
+  // Hour of day distribution
+  const hourData = useMemo(() => {
+    const counts = Array(24).fill(0);
+    tickets.forEach(t => {
+      if (t.created) {
+        // Convert to Central time
+        const d = new Date(t.created);
+        const ctHour = parseInt(d.toLocaleString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', hour12: false }));
+        counts[ctHour]++;
+      }
+    });
+    return counts;
+  }, [tickets]);
+
+  const maxHour = Math.max(...hourData, 1);
+
+  // Colors for projects
+  const projectColors = {
+    PSS: 'var(--accent-blue)',
+    MCQM: 'var(--accent-green)',
+    FHPS: 'var(--accent-purple)',
+    OAC: 'var(--accent-orange)',
+  };
+
+  const priorityColors = {
+    Highest: 'var(--priority-highest)',
+    High: 'var(--priority-high)',
+    Medium: 'var(--priority-medium)',
+    Low: 'var(--priority-low)',
+    Lowest: 'var(--priority-lowest)',
+  };
+
+  return (
+    <div>
+      <div className="section-header">Open Queue Analytics</div>
+
+      <div className="chart-grid">
+        {/* Volume by Project */}
+        <div className="chart-card">
+          <div className="chart-card-title">Volume by Project</div>
+          <div className="bar-chart">
+            {projectData.map(([proj, count]) => (
+              <div key={proj} className="bar-row">
+                <div className="bar-label">{proj}</div>
+                <div className="bar-track">
+                  <div className="bar-fill" style={{
+                    width: `${(count / maxProject) * 100}%`,
+                    background: projectColors[proj] || 'var(--accent-blue)',
+                  }}>
+                    {count}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{marginTop: 8, fontSize: 11, color: 'var(--text-muted)'}}>
+            MCQM = Patient Support Services
+          </div>
+        </div>
+
+        {/* Volume by Issue Type */}
+        <div className="chart-card">
+          <div className="chart-card-title">Volume by Issue Type</div>
+          <div className="bar-chart">
+            {typeData.map(([type, count]) => (
+              <div key={type} className="bar-row">
+                <div className="bar-label" style={{minWidth: 100}}>{type}</div>
+                <div className="bar-track">
+                  <div className="bar-fill" style={{
+                    width: `${(count / maxType) * 100}%`,
+                    background: 'var(--accent-cyan)',
+                  }}>
+                    {count}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Volume by Priority */}
+        <div className="chart-card">
+          <div className="chart-card-title">Volume by Priority</div>
+          <div className="bar-chart">
+            {priorityData.map(([priority, count]) => (
+              <div key={priority} className="bar-row">
+                <div className="bar-label">{priority}</div>
+                <div className="bar-track">
+                  <div className="bar-fill" style={{
+                    width: `${(count / maxPriority) * 100}%`,
+                    background: priorityColors[priority] || 'var(--accent-blue)',
+                  }}>
+                    {count}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Volume by Status */}
+        <div className="chart-card">
+          <div className="chart-card-title">Volume by Status</div>
+          <div className="bar-chart">
+            {statusData.map(([status, count]) => (
+              <div key={status} className="bar-row">
+                <div className="bar-label" style={{minWidth: 120}}>{status}</div>
+                <div className="bar-track">
+                  <div className="bar-fill" style={{
+                    width: `${(count / maxStatus) * 100}%`,
+                    background: status.toLowerCase().includes('reopen') ? 'var(--accent-red)' :
+                      status.toLowerCase().includes('progress') ? 'var(--accent-orange)' :
+                      status.toLowerCase().includes('wait') ? 'var(--accent-purple)' :
+                      'var(--accent-blue)',
+                  }}>
+                    {count}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Hour of Day Chart */}
+      <div className="chart-card" style={{marginBottom: 20}}>
+        <div className="chart-card-title">Created by Hour of Day (Central Time)</div>
+        <div style={{display: 'flex', alignItems: 'flex-end', gap: 2, height: 120}}>
+          {hourData.map((count, hour) => {
+            const h = hour % 12 || 12;
+            const ampm = hour < 12 ? 'A' : 'P';
+            const isBusinessHours = hour >= 8 && hour < 20;
+            return (
+              <div key={hour} style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2}}>
+                <div style={{
+                  width: '100%',
+                  height: `${(count / maxHour) * 100}px`,
+                  background: isBusinessHours ? 'var(--accent-blue)' : 'var(--border)',
+                  borderRadius: '2px 2px 0 0',
+                  minHeight: count > 0 ? 4 : 0,
+                  position: 'relative',
+                }}>
+                  {count > 0 && (
+                    <div style={{
+                      position: 'absolute', top: -16, width: '100%', textAlign: 'center',
+                      fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)',
+                    }}>
+                      {count}
+                    </div>
+                  )}
+                </div>
+                {hour % 3 === 0 && (
+                  <div style={{fontSize: 9, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)'}}>
+                    {h}{ampm}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{marginTop: 8, fontSize: 11, color: 'var(--text-muted)'}}>
+          Blue = business hours (8 AM - 8 PM CT) | Gray = after hours
+        </div>
+      </div>
+
+      {/* Day of Week */}
+      <div className="chart-card">
+        <div className="chart-card-title">Created by Day of Week</div>
+        <div className="bar-chart">
+          {dayOfWeekData.map(([day, count]) => (
+            <div key={day} className="bar-row">
+              <div className="bar-label">{day}</div>
+              <div className="bar-track">
+                <div className="bar-fill" style={{
+                  width: `${(count / maxDay) * 100}%`,
+                  background: ['Sat', 'Sun'].includes(day) ? 'var(--border-light)' : 'var(--accent-blue)',
+                }}>
+                  {count}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Recap View ───────────────────────────────────────────────
+function RecapView({ tickets, stats }) {
+  const [copied, setCopied] = useState(false);
+
+  const recap = useMemo(() => {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-US', {
+      timeZone: 'America/Chicago',
+      month: '2-digit', day: '2-digit', year: 'numeric',
+    });
+
+    const byProject = {};
+    const byAssignee = {};
+    const reopened = [];
+    const stagnant = [];
+
+    tickets.forEach(t => {
+      byProject[t.projectKey] = (byProject[t.projectKey] || 0) + 1;
+      byAssignee[t.assignee] = (byAssignee[t.assignee] || 0) + 1;
+      if (t.isReopened) reopened.push(t);
+      if (t.isStagnant) stagnant.push(t);
+    });
+
+    const whoopCount = tickets.filter(t => t.isWhoop).length;
+
+    const lines = [
+      `CX Daily Recap - ${dateStr}`,
+      ``,
+      `OPEN BACKLOG: ${tickets.length}`,
+      `REOPENED: ${reopened.length}`,
+      `STAGNANT (24h+): ${stagnant.length}`,
+      ``,
+      `BY PROJECT:`,
+      ...Object.entries(byProject).sort((a, b) => b[1] - a[1]).map(([proj, count]) => {
+        let extra = '';
+        if (proj === 'PSS') extra = ` (Whoop: ${whoopCount})`;
+        const label = PROJECT_LABELS[proj] || proj;
+        return `  ${proj} (${label}): ${count}${extra}`;
+      }),
+      ``,
+      `TEAM WORKLOAD:`,
+      ...Object.entries(byAssignee).sort((a, b) => b[1] - a[1]).map(([name, count]) =>
+        `  ${name}: ${count}`
+      ),
+    ];
+
+    if (reopened.length > 0) {
+      lines.push('', 'REOPENED TICKETS:');
+      reopened.forEach(t => {
+        lines.push(`  ${t.key} (${t.assignee}) - reopen x${t.reopenCount}`);
+      });
+    }
+
+    if (stagnant.length > 0) {
+      lines.push('', `STAGNANT TICKETS (TOP ${Math.min(10, stagnant.length)}):`);
+      stagnant.slice(0, 10).forEach(t => {
+        lines.push(`  ${t.key} (${t.assignee}) - ${formatAge(t.hoursSinceUpdate)} since update`);
+      });
+      if (stagnant.length > 10) lines.push(`  ...and ${stagnant.length - 10} more`);
+    }
+
+    return lines.join('\n');
+  }, [tickets, stats]);
+
+  const slackRecap = useMemo(() => {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-US', {
+      timeZone: 'America/Chicago',
+      month: '2-digit', day: '2-digit', year: 'numeric',
+    });
+
+    const byProject = {};
+    const byAssignee = {};
+    const reopened = tickets.filter(t => t.isReopened);
+    const stagnant = tickets.filter(t => t.isStagnant);
+    const whoopCount = tickets.filter(t => t.isWhoop).length;
+
+    tickets.forEach(t => {
+      byProject[t.projectKey] = (byProject[t.projectKey] || 0) + 1;
+      byAssignee[t.assignee] = (byAssignee[t.assignee] || 0) + 1;
+    });
+
+    const lines = [
+      `:bar_chart: *CX Daily Recap - ${dateStr}*`,
+      ``,
+      `:open_file_folder: Open Backlog: *${tickets.length}*`,
+      reopened.length > 0 ? `:rotating_light: Reopened: *${reopened.length}*` : ':large_green_circle: No reopened tickets',
+      stagnant.length > 0 ? `:warning: Stagnant (24h+): *${stagnant.length}*` : ':large_green_circle: No stagnant tickets',
+      ``,
+      `*Open by Project*`,
+      ...Object.entries(byProject).sort((a, b) => b[1] - a[1]).map(([proj, count]) => {
+        let extra = '';
+        if (proj === 'PSS') extra = ` (Whoop: ${whoopCount})`;
+        return `  ${proj}: *${count}*${extra}`;
+      }),
+      ``,
+      `*Team Workload*`,
+      ...Object.entries(byAssignee).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([name, count]) =>
+        `  ${name}: ${count}`
+      ),
+    ];
+
+    if (reopened.length > 0) {
+      lines.push('', '*Reopened:*');
+      reopened.slice(0, 5).forEach(t => {
+        lines.push(`  ${t.key} (${t.assignee})`);
+      });
+    }
+
+    return lines.join('\n');
+  }, [tickets]);
+
+  const handleCopy = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <div>
+      <div className="section-header">Daily Recap</div>
+      <p style={{color: 'var(--text-secondary)', fontSize: 13, marginBottom: 16}}>
+        Copy and paste into Slack, or configure Zapier to hit the <code style={{
+          fontFamily: 'var(--font-mono)', background: '#f0f2f5', padding: '2px 6px', borderRadius: 3
+        }}>/api/daily-recap</code> endpoint at 4:00 PM CT.
+      </p>
+
+      <div style={{marginBottom: 12}}>
+        <div style={{display: 'flex', gap: 8, marginBottom: 8}}>
+          <button className={`copy-btn ${copied ? 'copied' : ''}`} onClick={() => handleCopy(slackRecap)}>
+            {copied ? 'Copied!' : 'Copy Slack Version'}
+          </button>
+          <button className="copy-btn" style={{background: '#f5f7fa', color: 'var(--text-primary)', border: '1px solid var(--border)'}}
+            onClick={() => handleCopy(recap)}>
+            Copy Plain Text
+          </button>
+        </div>
+      </div>
+
+      <div className="section-header" style={{fontSize: 13}}>Slack Format Preview</div>
+      <div className="recap-box" style={{marginBottom: 20}}>{slackRecap}</div>
+
+      <div className="section-header" style={{fontSize: 13}}>Plain Text Format</div>
+      <div className="recap-box">{recap}</div>
+    </div>
+  );
+}
+
+// ── Mount ────────────────────────────────────────────────────
+ReactDOM.render(<App />, document.getElementById('root'));
+</script>
+</body>
+</html>

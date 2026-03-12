@@ -1,0 +1,16 @@
+{
+  "name": "cx-agent-workbench",
+  "version": "1.0.0",
+  "description": "CX Agent Workbench - Real-time Jira operations dashboard",
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "echo 'Static site - no build needed'",
+    "deploy": "netlify deploy --prod"
+  },
+  "dependencies": {
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "netlify-cli": "^17.0.0"
+  }
+}
