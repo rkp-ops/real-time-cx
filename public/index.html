@@ -7,6 +7,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -695,6 +696,14 @@
 <script type="text/babel">
 const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
+// ── Supabase Auth ────────────────────────────────────────────
+const SUPABASE_URL = 'https://eeszygextbqglayglvfm.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_txIrKbYtv9kjSKXjQVJFbw_hzUsLNEK';
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const AuthContext = React.createContext({ user: null, signOut: () => {} });
+function useAuth() { return React.useContext(AuthContext); }
+
 // ── Config ───────────────────────────────────────────────────
 const API_BASE = '/api/jira-proxy';
 const REFRESH_INTERVAL = 60000; // 60 seconds
@@ -1067,6 +1076,18 @@ function App() {
           <div className="header-status" style={{color: 'var(--text-muted)'}}>
             {lastRefresh ? formatTimeCT(lastRefresh) : '-'}
           </div>
+          {(() => {
+            try {
+              const { user, signOut } = useAuth();
+              if (!user) return null;
+              return (
+                <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                  <span style={{fontSize: 11, color: 'var(--text-muted)'}}>{user.email}</span>
+                  <button onClick={signOut} style={{background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 10, textDecoration: 'underline'}}>Sign out</button>
+                </div>
+              );
+            } catch(e) { return null; }
+          })()}
         </div>
       </header>
 
@@ -2136,8 +2157,133 @@ function RecapView({ tickets, stats }) {
   );
 }
 
+// ── Login Page ───────────────────────────────────────────────
+function LoginPage({ onAuth }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [mode, setMode] = useState('login');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    const { data, error: err } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (err) { setError(err.message); setLoading(false); return; }
+    onAuth(data.user);
+  };
+
+  const handleSignup = async (e) => {
+    e.preventDefault();
+    if (!fullName.trim()) { setError('Full name is required'); return; }
+    setLoading(true);
+    setError('');
+    const { data, error: err } = await supabaseClient.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: fullName.trim() } }
+    });
+    if (err) { setError(err.message); setLoading(false); return; }
+    if (data.user && !data.session) {
+      setError('Check your email to confirm your account, then sign in.');
+      setMode('login');
+      setLoading(false);
+      return;
+    }
+    onAuth(data.user);
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)' }}>
+      <div style={{ background: '#fff', borderRadius: 12, padding: '40px 32px', maxWidth: 400, width: '100%', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <h1 style={{ color: 'var(--text-primary)', fontSize: 22, margin: '0 0 4px', fontFamily: 'var(--font-mono)' }}>CX WORKBENCH</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: 0 }}>{mode === 'login' ? 'Sign in to continue' : 'Create your account'}</p>
+        </div>
+        <form onSubmit={mode === 'login' ? handleLogin : handleSignup}>
+          {mode === 'signup' && (
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>Full Name</label>
+              <input type="text" value={fullName} onChange={e => setFullName(e.target.value)}
+                placeholder="Jane Smith"
+                style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 14, boxSizing: 'border-box' }} />
+            </div>
+          )}
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>Email</label>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
+              placeholder="you@steadymd.com"
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 14, boxSizing: 'border-box' }} />
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>Password</label>
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required
+              placeholder={mode === 'signup' ? 'Min 6 characters' : '••••••••'}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 14, boxSizing: 'border-box' }} />
+          </div>
+          {error && <div style={{ background: 'var(--accent-red-soft)', color: 'var(--accent-red)', padding: '8px 12px', borderRadius: 6, fontSize: 12, marginBottom: 12 }}>{error}</div>}
+          <button type="submit" disabled={loading}
+            style={{ width: '100%', padding: '10px', fontSize: 14, background: 'var(--accent-blue)', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, cursor: 'pointer' }}>
+            {loading ? '...' : mode === 'login' ? 'Sign In' : 'Create Account'}
+          </button>
+        </form>
+        <div style={{ textAlign: 'center', marginTop: 16, fontSize: 13, color: 'var(--text-muted)' }}>
+          {mode === 'login' ? (
+            <span>No account? <button onClick={() => { setMode('signup'); setError(''); }} style={{ background: 'none', border: 'none', color: 'var(--accent-blue)', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>Sign up</button></span>
+          ) : (
+            <span>Already have an account? <button onClick={() => { setMode('login'); setError(''); }} style={{ background: 'none', border: 'none', color: 'var(--accent-blue)', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>Sign in</button></span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Auth Provider ────────────────────────────────────────────
+function AuthProvider() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabaseClient.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) setUser(session.user);
+      setLoading(false);
+    });
+    const { data: { subscription } } = supabaseClient.auth.onAuthStateChange((event, session) => {
+      if (session?.user) setUser(session.user);
+      else setUser(null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const signOut = async () => {
+    await supabaseClient.auth.signOut();
+    setUser(null);
+  };
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)' }}>
+        <div className="loading-spinner" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage onAuth={setUser} />;
+  }
+
+  return (
+    <AuthContext.Provider value={{ user, signOut }}>
+      <App />
+    </AuthContext.Provider>
+  );
+}
+
 // ── Mount ────────────────────────────────────────────────────
-ReactDOM.render(<App />, document.getElementById('root'));
+ReactDOM.render(<AuthProvider />, document.getElementById('root'));
 </script>
 </body>
 </html>
