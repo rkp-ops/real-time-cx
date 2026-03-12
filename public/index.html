@@ -631,6 +631,63 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }
     .tooltip-container:hover .tooltip-text { display: block; }
+
+    /* ── Chronic Reopen Alert (pulsing red glow) ── */
+    .chronic-reopen-alert {
+      background: linear-gradient(135deg, #fff0f3, #ffe0e6);
+      border: 2px solid var(--accent-red);
+      border-radius: var(--radius-lg);
+      padding: 16px 20px;
+      margin-bottom: 16px;
+      animation: alertPulse 1.5s ease-in-out infinite;
+      box-shadow: 0 0 20px rgba(255, 38, 77, 0.3);
+    }
+    @keyframes alertPulse {
+      0%, 100% { box-shadow: 0 0 20px rgba(255, 38, 77, 0.3); }
+      50% { box-shadow: 0 0 40px rgba(255, 38, 77, 0.6); }
+    }
+    .chronic-reopen-alert .alert-title {
+      font-size: 18px; font-weight: 700; color: var(--accent-red);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .chronic-reopen-alert .alert-ticket {
+      display: flex; align-items: center; gap: 12px;
+      padding: 8px 0; border-bottom: 1px solid rgba(255, 38, 77, 0.15);
+      font-size: 13px;
+    }
+    .chronic-reopen-alert .alert-ticket:last-child { border-bottom: none; }
+
+    /* SLA breach badge */
+    .tag-sla-breach {
+      display: inline-block; font-size: 10px; font-weight: 700;
+      padding: 2px 6px; border-radius: 3px; margin-left: 4px;
+      background: var(--accent-red-soft); color: var(--accent-red);
+      border: 1px solid var(--accent-red);
+    }
+    .tag-sla-ok {
+      display: inline-block; font-size: 10px;
+      padding: 2px 6px; border-radius: 3px; margin-left: 4px;
+      background: #e6f6f8; color: #1a8c96;
+    }
+    /* High comment volume badge */
+    .tag-high-comments {
+      display: inline-block; font-size: 10px; font-weight: 600;
+      padding: 2px 6px; border-radius: 3px; margin-left: 4px;
+      background: var(--accent-orange-soft); color: var(--accent-orange);
+    }
+    /* FHPS penalty badge */
+    .tag-penalty {
+      display: inline-block; font-size: 10px; font-weight: 700;
+      padding: 2px 6px; border-radius: 3px; margin-left: 4px;
+      background: #FF264D; color: white;
+    }
+    /* Chronic reopen tag */
+    .tag-chronic {
+      display: inline-block; font-size: 10px; font-weight: 700;
+      padding: 2px 6px; border-radius: 3px; margin-left: 4px;
+      background: #FF264D; color: white;
+      animation: alertPulse 1.5s ease-in-out infinite;
+    }
   </style>
 </head>
 <body>
@@ -745,8 +802,15 @@ function generateDemoData() {
     const partner = projectKey === 'PSS' ? partners[Math.floor(Math.random() * partners.length)] : null;
     const isWhoop = partner === 'Whoop';
     const assignee = assignees[Math.floor(Math.random() * assignees.length)];
-    const reopenCount = status === 'Reopened' ? Math.floor(Math.random() * 3) + 1 : Math.random() < 0.1 ? 1 : 0;
-    const commentCount = Math.floor(Math.random() * 12);
+    const reopenCount = status === 'Reopened' ? Math.floor(Math.random() * 5) + 1 : Math.random() < 0.1 ? Math.floor(Math.random() * 2) + 1 : 0;
+    const commentCount = Math.floor(Math.random() * 14);
+    const hoursSinceCreation = hoursAgo;
+    const slaThresholdHours = projectKey === 'FHPS' ? 2 : 4;
+    const hoursToFirstReply = Math.random() < 0.3 ? null : Math.random() * 8;
+    const slaBreach = hoursToFirstReply !== null ? hoursToFirstReply > slaThresholdHours : hoursSinceCreation > slaThresholdHours;
+    const slaBreachPenalty = (slaBreach && projectKey === 'FHPS') ? 200 : 0;
+    const reopensIn72h = reopenCount > 0 ? Math.min(reopenCount, Math.floor(Math.random() * 6)) : 0;
+    const isChronicReopen = reopensIn72h >= 4;
 
     tickets.push({
       key,
@@ -775,10 +839,22 @@ function generateDemoData() {
       waitingForResponse: Math.random() > 0.6,
       reopenCount,
       lastReopened: reopenCount > 0 ? updated : null,
+      reopenTimestamps: [],
+      statusTransitions: [],
+      reopensIn72h,
+      isChronicReopen,
       assigneeChanges: Math.floor(Math.random() * 3),
       hoursSinceUpdate: Math.round(hoursSinceUpdate * 10) / 10,
       hoursSinceActivity: Math.round(hoursSinceUpdate * 10) / 10,
+      hoursSinceCreation: Math.round(hoursSinceCreation * 10) / 10,
       cycleTimeHours: null,
+      hoursToFirstReply: hoursToFirstReply ? Math.round(hoursToFirstReply * 10) / 10 : null,
+      slaThresholdHours,
+      slaBreach,
+      slaBreachPenalty,
+      firstReplyTime: hoursToFirstReply ? new Date(now - (hoursAgo - hoursToFirstReply) * 3600000).toISOString() : null,
+      awaitingFirstReply: hoursToFirstReply === null,
+      highCommentVolume: commentCount > 6,
       isStagnant: hoursSinceUpdate > 24,
       isReopened: reopenCount > 0,
       jiraUrl: `https://${JIRA_DOMAIN}/browse/${key}`,
@@ -845,7 +921,11 @@ function App() {
       byAssignee[t.assignee] = (byAssignee[t.assignee] || 0) + 1;
     });
     const whoop = tickets.filter(t => t.isWhoop).length;
-    return { open, reopened, stagnant, waiting, byProject, byAssignee, whoop };
+    const slaBreaches = tickets.filter(t => t.slaBreach).length;
+    const fhpsPenalties = tickets.reduce((sum, t) => sum + (t.slaBreachPenalty || 0), 0);
+    const highComments = tickets.filter(t => t.highCommentVolume).length;
+    const chronicReopens = tickets.filter(t => t.isChronicReopen).length;
+    return { open, reopened, stagnant, waiting, byProject, byAssignee, whoop, slaBreaches, fhpsPenalties, highComments, chronicReopens };
   }, [tickets]);
 
   // Filtered + sorted tickets
@@ -867,6 +947,12 @@ function App() {
         filtered = filtered.filter(t => t.isStagnant);
       } else if (statusFilter === 'WAITING') {
         filtered = filtered.filter(t => t.waitingForResponse);
+      } else if (statusFilter === 'SLA_BREACH') {
+        filtered = filtered.filter(t => t.slaBreach);
+      } else if (statusFilter === 'HIGH_COMMENTS') {
+        filtered = filtered.filter(t => t.highCommentVolume);
+      } else if (statusFilter === 'CHRONIC_REOPEN') {
+        filtered = filtered.filter(t => t.isChronicReopen);
       } else {
         filtered = filtered.filter(t => t.status === statusFilter);
       }
@@ -900,6 +986,27 @@ function App() {
           break;
         case 'assignee':
           cmp = a.assignee.localeCompare(b.assignee);
+          break;
+        case 'status':
+          cmp = a.status.localeCompare(b.status);
+          break;
+        case 'project':
+          cmp = a.projectKey.localeCompare(b.projectKey);
+          break;
+        case 'totalAge':
+          cmp = (b.hoursSinceCreation || 0) - (a.hoursSinceCreation || 0);
+          break;
+        case 'sla': {
+          const aVal = a.slaBreach ? -9999 : (a.hoursToFirstReply ?? 9998);
+          const bVal = b.slaBreach ? -9999 : (b.hoursToFirstReply ?? 9998);
+          cmp = aVal - bVal;
+          break;
+        }
+        case 'comments':
+          cmp = (b.commentCount || 0) - (a.commentCount || 0);
+          break;
+        case 'reopens':
+          cmp = (b.reopenCount || 0) - (a.reopenCount || 0);
           break;
         default:
           cmp = prioritySortOrder(a.priority) - prioritySortOrder(b.priority);
@@ -971,8 +1078,8 @@ function App() {
         </button>
         <button className={`tab-btn ${activeTab === 'alerts' ? 'active' : ''}`} onClick={() => setActiveTab('alerts')}>
           Alerts
-          {(stats.reopened > 0 || stats.stagnant > 0) && (
-            <span className="badge red">{stats.reopened + stats.stagnant}</span>
+          {(stats.reopened > 0 || stats.stagnant > 0 || stats.slaBreaches > 0 || stats.chronicReopens > 0) && (
+            <span className="badge red">{stats.chronicReopens + stats.slaBreaches + stats.reopened + stats.stagnant}</span>
           )}
         </button>
         <button className={`tab-btn ${activeTab === 'team' ? 'active' : ''}`} onClick={() => setActiveTab('team')}>
@@ -1060,6 +1167,16 @@ function QueueView({
           <div className="stat-value" style={{color: 'var(--accent-cyan)'}}>{stats.whoop}</div>
           <div className="stat-sub">active Whoop tickets</div>
         </div>
+        <div className={`stat-card ${stats.slaBreaches > 0 ? 'alert' : ''}`}>
+          <div className="stat-label">SLA Breaches</div>
+          <div className="stat-value" style={{color: stats.slaBreaches > 0 ? 'var(--accent-red)' : 'var(--text-primary)'}}>{stats.slaBreaches}</div>
+          <div className="stat-sub">{stats.fhpsPenalties > 0 ? `$${stats.fhpsPenalties} FHPS penalties` : 'first reply > threshold'}</div>
+        </div>
+        <div className={`stat-card ${stats.chronicReopens > 0 ? 'alert' : ''}`}>
+          <div className="stat-label">Chronic Reopens</div>
+          <div className="stat-value" style={{color: stats.chronicReopens > 0 ? 'var(--accent-red)' : 'var(--text-primary)'}}>{stats.chronicReopens}</div>
+          <div className="stat-sub">4+ reopens in 72h</div>
+        </div>
       </div>
 
       {/* Reopened banner */}
@@ -1110,6 +1227,9 @@ function QueueView({
           <option value="REOPENED">⚠ Reopened</option>
           <option value="STAGNANT">⏰ Stagnant</option>
           <option value="WAITING">⏳ Waiting</option>
+          <option value="SLA_BREACH">🚨 SLA Breach</option>
+          <option value="HIGH_COMMENTS">💬 6+ Comments</option>
+          <option value="CHRONIC_REOPEN">🔥 Chronic Reopen</option>
           {uniqueStatuses.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
 
@@ -1124,24 +1244,52 @@ function QueueView({
         </span>
       </div>
 
+      {/* Chronic Reopen Banner */}
+      {(() => {
+        const chronic = tickets.filter(t => t.isChronicReopen);
+        if (chronic.length === 0) return null;
+        return (
+          <div className="chronic-reopen-alert">
+            <div className="alert-title">
+              🚨 CHRONIC REOPENS — {chronic.length} ticket{chronic.length > 1 ? 's' : ''} reopened 4+ times in 72 hours
+            </div>
+            <div style={{fontSize: 13, color: 'var(--text-secondary)', margin: '8px 0'}}>
+              These tickets indicate unresolved root causes requiring immediate lead intervention.
+            </div>
+            {chronic.map(t => (
+              <div key={t.key} className="alert-ticket">
+                <a href={t.jiraUrl} target="_blank" rel="noopener noreferrer" className="ticket-key" style={{fontSize: 14, fontWeight: 700}}>{t.key}</a>
+                <span className="tag-reopen" style={{fontSize: 12}}>x{t.reopenCount} total ({t.reopensIn72h} in 72h)</span>
+                <span style={{flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{t.summary}</span>
+                <span style={{fontSize: 12, color: 'var(--text-muted)'}}>{t.assignee}</span>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
       {/* Ticket Table */}
       <table className="ticket-table">
         <thead>
           <tr>
             <th onClick={() => handleSort('priority')}>Priority{sortIndicator('priority')}</th>
             <th onClick={() => handleSort('key')}>Key{sortIndicator('key')}</th>
+            <th onClick={() => handleSort('project')}>Proj{sortIndicator('project')}</th>
             <th>Summary</th>
-            <th>Status</th>
+            <th onClick={() => handleSort('status')}>Status{sortIndicator('status')}</th>
             <th onClick={() => handleSort('assignee')}>Assignee{sortIndicator('assignee')}</th>
             <th onClick={() => handleSort('created')}>Created{sortIndicator('created')}</th>
-            <th onClick={() => handleSort('age')}>Age{sortIndicator('age')}</th>
+            <th onClick={() => handleSort('totalAge')}>Total Age{sortIndicator('totalAge')}</th>
+            <th onClick={() => handleSort('age')}>Last Update{sortIndicator('age')}</th>
+            <th onClick={() => handleSort('comments')}>Cmts{sortIndicator('comments')}</th>
+            <th onClick={() => handleSort('sla')}>SLA{sortIndicator('sla')}</th>
             <th>Flags</th>
           </tr>
         </thead>
         <tbody>
           {tickets.map(t => (
             <tr key={t.key}
-              className={`${t.isStagnant ? 'stagnant' : ''} ${t.isReopened ? 'reopened' : ''}`}>
+              className={`${t.isStagnant ? 'stagnant' : ''} ${t.isReopened ? 'reopened' : ''} ${t.isChronicReopen ? 'reopened' : ''}`}>
               <td>
                 <span className={`badge-pill ${priorityClass(t.priority)}`}>{t.priority}</span>
               </td>
@@ -1149,6 +1297,9 @@ function QueueView({
                 <a href={t.jiraUrl} target="_blank" rel="noopener noreferrer" className="ticket-key">
                   {t.key}
                 </a>
+              </td>
+              <td style={{fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)'}}>
+                {t.projectKey}
               </td>
               <td>
                 <div className="ticket-summary">
@@ -1165,13 +1316,35 @@ function QueueView({
                 {formatTimeCT(t.created)}
               </td>
               <td>
+                <span className={`age-text ${ageClass(t.hoursSinceCreation)}`}>
+                  {formatAge(t.hoursSinceCreation)}
+                </span>
+              </td>
+              <td>
                 <span className={`age-text ${ageClass(t.hoursSinceUpdate)}`}>
                   {formatAge(t.hoursSinceUpdate)}
                 </span>
               </td>
+              <td style={{fontSize: 12, fontFamily: 'var(--font-mono)', textAlign: 'center',
+                color: t.highCommentVolume ? 'var(--accent-orange)' : 'var(--text-muted)',
+                fontWeight: t.highCommentVolume ? 700 : 400}}>
+                {t.commentCount || 0}
+              </td>
+              <td style={{whiteSpace: 'nowrap'}}>
+                {t.slaBreach ? (
+                  <span className="tag-sla-breach">BREACH {t.hoursToFirstReply ? `${Math.round(t.hoursToFirstReply)}h` : 'NO REPLY'}</span>
+                ) : t.awaitingFirstReply ? (
+                  <span style={{fontSize: 10, color: 'var(--accent-orange)', fontFamily: 'var(--font-mono)'}}>⏳ awaiting</span>
+                ) : t.hoursToFirstReply != null ? (
+                  <span className="tag-sla-ok">{t.hoursToFirstReply < 1 ? `${Math.round(t.hoursToFirstReply * 60)}m` : `${Math.round(t.hoursToFirstReply * 10) / 10}h`}</span>
+                ) : null}
+              </td>
               <td style={{whiteSpace: 'nowrap'}}>
                 {t.isWhoop && <span className="tag-whoop">WHOOP</span>}
-                {t.isReopened && <span className="tag-reopen">REOPEN x{t.reopenCount}</span>}
+                {t.isChronicReopen && <span className="tag-chronic">🔥 CHRONIC x{t.reopensIn72h}</span>}
+                {t.isReopened && !t.isChronicReopen && <span className="tag-reopen">REOPEN x{t.reopenCount}</span>}
+                {t.slaBreachPenalty > 0 && <span className="tag-penalty">${t.slaBreachPenalty}</span>}
+                {t.highCommentVolume && <span className="tag-high-comments">💬 {t.commentCount}</span>}
                 {t.isStagnant && <span className="tag-stagnant">STAGNANT</span>}
                 {t.waitingForResponse && (
                   <span style={{fontSize: 10, color: 'var(--accent-purple)', marginLeft: 4}}>⏳</span>
@@ -1181,7 +1354,7 @@ function QueueView({
           ))}
           {tickets.length === 0 && (
             <tr>
-              <td colSpan={8} style={{textAlign: 'center', padding: 40, color: 'var(--text-muted)'}}>
+              <td colSpan={12} style={{textAlign: 'center', padding: 40, color: 'var(--text-muted)'}}>
                 No tickets match the current filters.
               </td>
             </tr>
@@ -1194,8 +1367,15 @@ function QueueView({
 
 // ── Alerts View ──────────────────────────────────────────────
 function AlertsView({ tickets, stats }) {
+  const chronicReopens = tickets.filter(t => t.isChronicReopen)
+    .sort((a, b) => (b.reopensIn72h || 0) - (a.reopensIn72h || 0));
   const reopened = tickets.filter(t => t.isReopened)
     .sort((a, b) => (b.reopenCount || 0) - (a.reopenCount || 0));
+  const slaBreached = tickets.filter(t => t.slaBreach)
+    .sort((a, b) => (b.hoursToFirstReply || 9999) - (a.hoursToFirstReply || 9999));
+  const fhpsPenaltyTotal = tickets.reduce((sum, t) => sum + (t.slaBreachPenalty || 0), 0);
+  const highCommentTickets = tickets.filter(t => t.highCommentVolume)
+    .sort((a, b) => (b.commentCount || 0) - (a.commentCount || 0));
   const stagnant = tickets.filter(t => t.isStagnant)
     .sort((a, b) => (b.hoursSinceUpdate || 0) - (a.hoursSinceUpdate || 0));
   const unassigned = tickets.filter(t => t.assignee === 'Unassigned');
@@ -1204,9 +1384,23 @@ function AlertsView({ tickets, stats }) {
   return (
     <div>
       <div className="stats-row">
+        <div className={`stat-card ${chronicReopens.length > 0 ? 'alert' : ''}`}>
+          <div className="stat-label">Chronic Reopens</div>
+          <div className="stat-value" style={{color: chronicReopens.length > 0 ? 'var(--accent-red)' : 'var(--text-primary)'}}>{chronicReopens.length}</div>
+          <div className="stat-sub">4+ in 72h</div>
+        </div>
+        <div className={`stat-card ${slaBreached.length > 0 ? 'alert' : ''}`}>
+          <div className="stat-label">SLA Breaches</div>
+          <div className="stat-value" style={{color: slaBreached.length > 0 ? 'var(--accent-red)' : 'var(--text-primary)'}}>{slaBreached.length}</div>
+          <div className="stat-sub">{fhpsPenaltyTotal > 0 ? `$${fhpsPenaltyTotal} penalties` : 'first reply overdue'}</div>
+        </div>
         <div className={`stat-card ${reopened.length > 0 ? 'alert' : ''}`}>
           <div className="stat-label">Reopened Tickets</div>
           <div className="stat-value" style={{color: 'var(--accent-red)'}}>{reopened.length}</div>
+        </div>
+        <div className={`stat-card ${highCommentTickets.length > 0 ? 'warn' : ''}`}>
+          <div className="stat-label">High Comments (6+)</div>
+          <div className="stat-value" style={{color: highCommentTickets.length > 0 ? 'var(--accent-orange)' : 'var(--text-primary)'}}>{highCommentTickets.length}</div>
         </div>
         <div className={`stat-card ${stagnant.length > 5 ? 'warn' : ''}`}>
           <div className="stat-label">Stagnant (24h+)</div>
@@ -1217,10 +1411,117 @@ function AlertsView({ tickets, stats }) {
           <div className="stat-value" style={{color: 'var(--accent-purple)'}}>{unassigned.length}</div>
         </div>
         <div className={`stat-card ${highPriStagnant.length > 0 ? 'alert' : ''}`}>
-          <div className="stat-label">High Priority + Stagnant</div>
+          <div className="stat-label">High Pri + Stagnant</div>
           <div className="stat-value" style={{color: 'var(--accent-red)'}}>{highPriStagnant.length}</div>
         </div>
       </div>
+
+      {/* CHRONIC REOPEN ALERT — Big, unmissable, pulsing */}
+      {chronicReopens.length > 0 && (
+        <div className="chronic-reopen-alert">
+          <div className="alert-title">
+            🚨 CHRONIC REOPENS — {chronicReopens.length} ticket{chronicReopens.length > 1 ? 's' : ''} reopened 4+ times in 72 hours
+          </div>
+          <div style={{fontSize: 13, color: 'var(--text-secondary)', margin: '8px 0'}}>
+            These tickets indicate unresolved root causes requiring immediate lead intervention.
+          </div>
+          {chronicReopens.map(t => (
+            <div key={t.key} className="alert-ticket">
+              <a href={t.jiraUrl} target="_blank" rel="noopener noreferrer" className="ticket-key" style={{fontSize: 14, fontWeight: 700, minWidth: 100}}>{t.key}</a>
+              <span className="tag-chronic">🔥 x{t.reopenCount} total ({t.reopensIn72h} in 72h)</span>
+              <span style={{flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{t.summary}</span>
+              <span style={{fontSize: 12, color: 'var(--text-muted)', minWidth: 80}}>{t.assignee}</span>
+              <span className={`badge-pill ${priorityClass(t.priority)}`} style={{fontSize: 10}}>{t.priority}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="section-divider" />
+
+      {/* SLA Breach Section */}
+      <div className="section-header">
+        ⏱ SLA Breaches <span className="count">({slaBreached.length})</span>
+        {fhpsPenaltyTotal > 0 && (
+          <span style={{marginLeft: 12, color: 'var(--accent-red)', fontWeight: 700, fontSize: 14}}>
+            💰 ${fhpsPenaltyTotal} in FHPS penalties
+          </span>
+        )}
+      </div>
+      {slaBreached.length === 0 ? (
+        <p style={{color: 'var(--text-muted)', marginBottom: 20}}>No SLA breaches. All first replies within threshold.</p>
+      ) : (
+        <table className="ticket-table" style={{marginBottom: 24}}>
+          <thead>
+            <tr>
+              <th>Key</th><th>Project</th><th>Summary</th><th>1st Reply</th><th>Threshold</th><th>Over By</th><th>Penalty</th><th>Assignee</th>
+            </tr>
+          </thead>
+          <tbody>
+            {slaBreached.map(t => {
+              const overBy = t.hoursToFirstReply != null
+                ? Math.round((t.hoursToFirstReply - t.slaThresholdHours) * 10) / 10
+                : null;
+              return (
+                <tr key={t.key} className="reopened">
+                  <td><a href={t.jiraUrl} target="_blank" rel="noopener noreferrer" className="ticket-key">{t.key}</a></td>
+                  <td style={{fontSize: 11, fontFamily: 'var(--font-mono)'}}>{t.projectKey}</td>
+                  <td><div className="ticket-summary">{t.summary}</div></td>
+                  <td style={{fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-red)'}}>
+                    {t.hoursToFirstReply != null ? `${t.hoursToFirstReply}h` : 'NO REPLY'}
+                  </td>
+                  <td style={{fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)'}}>
+                    {t.slaThresholdHours}h {t.projectKey === 'FHPS' ? '(FHPS)' : ''}
+                  </td>
+                  <td style={{fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent-red)', fontWeight: 700}}>
+                    {overBy != null ? `+${overBy}h` : `+${Math.round((Date.now() - new Date(t.created).getTime()) / 3600000 - t.slaThresholdHours)}h`}
+                  </td>
+                  <td>
+                    {t.slaBreachPenalty > 0 ? <span className="tag-penalty">${t.slaBreachPenalty}</span> : <span style={{color: 'var(--text-muted)', fontSize: 11}}>—</span>}
+                  </td>
+                  <td style={{fontSize: 12}}>{t.assignee}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+
+      <div className="section-divider" />
+
+      {/* High Comment Volume Section */}
+      <div className="section-header">
+        💬 High Comment Volume (6+) <span className="count">({highCommentTickets.length})</span>
+      </div>
+      {highCommentTickets.length === 0 ? (
+        <p style={{color: 'var(--text-muted)', marginBottom: 20}}>No tickets with excessive comment volume.</p>
+      ) : (
+        <table className="ticket-table" style={{marginBottom: 24}}>
+          <thead>
+            <tr>
+              <th>Key</th><th>Summary</th><th>Total</th><th>Internal</th><th>External</th><th>Reopens</th><th>Assignee</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {highCommentTickets.map(t => (
+              <tr key={t.key}>
+                <td><a href={t.jiraUrl} target="_blank" rel="noopener noreferrer" className="ticket-key">{t.key}</a></td>
+                <td><div className="ticket-summary">{t.summary}</div></td>
+                <td style={{fontSize: 14, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--accent-orange)', textAlign: 'center'}}>{t.commentCount}</td>
+                <td style={{fontSize: 12, fontFamily: 'var(--font-mono)', textAlign: 'center', color: 'var(--text-muted)'}}>{t.internalComments}</td>
+                <td style={{fontSize: 12, fontFamily: 'var(--font-mono)', textAlign: 'center', color: 'var(--text-secondary)'}}>{t.externalComments}</td>
+                <td>
+                  {t.reopenCount > 0 ? <span className="tag-reopen">x{t.reopenCount}</span> : <span style={{color: 'var(--text-muted)', fontSize: 11}}>0</span>}
+                </td>
+                <td style={{fontSize: 12}}>{t.assignee}</td>
+                <td><span className={`status-badge ${statusClass(t.status)}`}>{t.status}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <div className="section-divider" />
 
       {/* Reopened Section */}
       <div className="section-header">
@@ -1232,15 +1533,18 @@ function AlertsView({ tickets, stats }) {
         <table className="ticket-table" style={{marginBottom: 24}}>
           <thead>
             <tr>
-              <th>Key</th><th>Summary</th><th>Reopen Count</th><th>Assignee</th><th>Priority</th><th>Age</th>
+              <th>Key</th><th>Summary</th><th>Reopen Count</th><th>In 72h</th><th>Assignee</th><th>Priority</th><th>Age</th>
             </tr>
           </thead>
           <tbody>
             {reopened.map(t => (
               <tr key={t.key} className="reopened">
-                <td><a href={t.jiraUrl} target="_blank" className="ticket-key">{t.key}</a></td>
+                <td><a href={t.jiraUrl} target="_blank" rel="noopener noreferrer" className="ticket-key">{t.key}</a></td>
                 <td><div className="ticket-summary">{t.summary}</div></td>
                 <td><span className="tag-reopen">x{t.reopenCount}</span></td>
+                <td style={{fontSize: 12, fontFamily: 'var(--font-mono)', color: t.reopensIn72h >= 4 ? 'var(--accent-red)' : 'var(--text-muted)', fontWeight: t.reopensIn72h >= 4 ? 700 : 400}}>
+                  {t.reopensIn72h || 0}
+                </td>
                 <td style={{fontSize: 12}}>{t.assignee}</td>
                 <td><span className={`badge-pill ${priorityClass(t.priority)}`}>{t.priority}</span></td>
                 <td><span className={`age-text ${ageClass(t.hoursSinceUpdate)}`}>{formatAge(t.hoursSinceUpdate)}</span></td>
@@ -1268,7 +1572,7 @@ function AlertsView({ tickets, stats }) {
           <tbody>
             {stagnant.slice(0, 25).map(t => (
               <tr key={t.key} className="stagnant">
-                <td><a href={t.jiraUrl} target="_blank" className="ticket-key">{t.key}</a></td>
+                <td><a href={t.jiraUrl} target="_blank" rel="noopener noreferrer" className="ticket-key">{t.key}</a></td>
                 <td><div className="ticket-summary">{t.summary}</div></td>
                 <td><span className={`age-text ${ageClass(t.hoursSinceUpdate)}`}>{formatAge(t.hoursSinceUpdate)} ago</span></td>
                 <td style={{fontSize: 12}}>{t.assignee}</td>
@@ -1296,7 +1600,7 @@ function AlertsView({ tickets, stats }) {
           <tbody>
             {unassigned.map(t => (
               <tr key={t.key}>
-                <td><a href={t.jiraUrl} target="_blank" className="ticket-key">{t.key}</a></td>
+                <td><a href={t.jiraUrl} target="_blank" rel="noopener noreferrer" className="ticket-key">{t.key}</a></td>
                 <td><div className="ticket-summary">{t.summary}</div></td>
                 <td><span className={`badge-pill ${priorityClass(t.priority)}`}>{t.priority}</span></td>
                 <td><span className={`status-badge ${statusClass(t.status)}`}>{t.status}</span></td>

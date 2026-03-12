@@ -186,6 +186,8 @@ function transformIssue(issue) {
   let assigneeChanges = 0;
   let lastReopened = null;
   const statusTransitions = [];
+  const reopenTimestamps = [];
+  const FINAL_STATUSES = ['done', 'closed', 'resolved', 'cancelled', 'declined', "won't do", 'wont do'];
 
   for (const history of changelog) {
     for (const item of history.items || []) {
@@ -195,11 +197,13 @@ function transformIssue(issue) {
           to: item.toString,
           when: history.created,
         });
-        if (item.toString === 'Reopened' || 
-            (item.fromString === 'Done' && item.toString !== 'Done') ||
-            (item.fromString === 'Closed' && item.toString !== 'Closed')) {
+        // True reopen = transition FROM a final/resolved status TO a non-final status
+        const fromLower = (item.fromString || '').toLowerCase();
+        const toLower = (item.toString || '').toLowerCase();
+        if (FINAL_STATUSES.includes(fromLower) && !FINAL_STATUSES.includes(toLower)) {
           reopenCount++;
           lastReopened = history.created;
+          reopenTimestamps.push(new Date(history.created));
         }
       }
       if (item.field === 'assignee') {
@@ -207,6 +211,28 @@ function transformIssue(issue) {
       }
     }
   }
+
+  // 72-hour reopen window for chronic reopen detection
+  const now = new Date();
+  const seventyTwoHoursAgo = new Date(now - 72 * 3600000);
+  const reopensIn72h = reopenTimestamps.filter(ts => ts >= seventyTwoHoursAgo).length;
+  const isChronicReopen = reopensIn72h >= 4;
+
+  // SLA: First external reply time
+  const firstExternalComment = comments.find(c => !c.isInternal);
+  const firstReplyTime = firstExternalComment ? new Date(firstExternalComment.created) : null;
+  const ticketCreated = f.created ? new Date(f.created) : null;
+  const hoursToFirstReply = (ticketCreated && firstReplyTime)
+    ? (firstReplyTime - ticketCreated) / 3600000
+    : null;
+
+  // SLA thresholds: 120min (2h) for FHPS, 4h for all others
+  const slaThresholdHours = projectKey === 'FHPS' ? 2 : 4;
+  const isDone = (f.status?.statusCategory?.name || '').toLowerCase() === 'done';
+  const slaBreach = hoursToFirstReply !== null
+    ? hoursToFirstReply > slaThresholdHours
+    : (!isDone && ticketCreated ? (Date.now() - ticketCreated.getTime()) / 3600000 > slaThresholdHours : false);
+  const slaBreachPenalty = (slaBreach && projectKey === 'FHPS') ? 200 : 0;
 
   // Stagnant detection: hours since last update
   const updatedTime = f.updated ? new Date(f.updated) : null;
@@ -222,6 +248,9 @@ function transformIssue(issue) {
   const created = f.created ? new Date(f.created) : null;
   const resolved = f.resolutiondate ? new Date(f.resolutiondate) : null;
   const cycleTimeHours = (created && resolved) ? (resolved - created) / 3600000 : null;
+
+  // Age since creation (distinct from hoursSinceUpdate)
+  const hoursSinceCreation = ticketCreated ? (Date.now() - ticketCreated.getTime()) / 3600000 : null;
 
   return {
     key,
@@ -250,13 +279,24 @@ function transformIssue(issue) {
     waitingForResponse,
     reopenCount,
     lastReopened,
+    reopenTimestamps: reopenTimestamps.map(ts => ts.toISOString()),
+    reopensIn72h,
+    isChronicReopen,
     assigneeChanges,
     statusTransitions,
     hoursSinceUpdate: hoursSinceUpdate ? Math.round(hoursSinceUpdate * 10) / 10 : null,
     hoursSinceActivity: hoursSinceActivity ? Math.round(hoursSinceActivity * 10) / 10 : null,
+    hoursSinceCreation: hoursSinceCreation ? Math.round(hoursSinceCreation * 10) / 10 : null,
     cycleTimeHours: cycleTimeHours ? Math.round(cycleTimeHours * 10) / 10 : null,
+    hoursToFirstReply: hoursToFirstReply ? Math.round(hoursToFirstReply * 10) / 10 : null,
+    slaThresholdHours,
+    slaBreach,
+    slaBreachPenalty,
+    firstReplyTime: firstReplyTime ? firstReplyTime.toISOString() : null,
+    awaitingFirstReply: !firstExternalComment && !isDone,
+    highCommentVolume: comments.length > 6,
     isStagnant: hoursSinceUpdate !== null && hoursSinceUpdate > 24,
-    isReopened: (f.status?.name || '').toLowerCase() === 'reopened' || reopenCount > 0,
+    isReopened: reopenCount > 0,
     jiraUrl: `https://${JIRA_DOMAIN}/browse/${key}`,
   };
 }
