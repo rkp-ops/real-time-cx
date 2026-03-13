@@ -690,18 +690,15 @@
       animation: alertPulse 1.5s ease-in-out infinite;
     }
 
-    /* ── Tooltip (inline, hover-activated) ── */
+    /* ── Tooltip trigger (underline hint) ── */
     .tip {
-      position: relative;
       cursor: help;
       border-bottom: 1px dotted var(--text-muted);
     }
-    .tip .tip-text {
-      display: none;
-      position: absolute;
-      bottom: calc(100% + 6px);
-      left: 50%;
-      transform: translateX(-50%);
+    th .tip { border-bottom: none; }
+    /* ── Floating tooltip (portal, fixed position) ── */
+    .tip-float {
+      position: fixed;
       padding: 8px 12px;
       background: #173360;
       color: #fff;
@@ -712,13 +709,14 @@
       white-space: normal;
       width: max-content;
       max-width: 320px;
-      z-index: 200;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      z-index: 99999;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
       font-family: var(--font-sans);
       text-transform: none;
       letter-spacing: 0;
+      pointer-events: none;
     }
-    .tip .tip-text::after {
+    .tip-float::after {
       content: '';
       position: absolute;
       top: 100%;
@@ -727,9 +725,13 @@
       border: 5px solid transparent;
       border-top-color: #173360;
     }
-    .tip:hover .tip-text { display: block; }
-    /* For table headers — no underline variant */
-    th .tip { border-bottom: none; }
+    /* Arrow flips when tooltip is below */
+    .tip-float.below::after {
+      top: auto;
+      bottom: 100%;
+      border-top-color: transparent;
+      border-bottom-color: #173360;
+    }
 
     /* ── Definitions Tab ── */
     .def-grid {
@@ -883,10 +885,48 @@ function formatDateCT(date) {
 
 // ── Tooltip Component ────────────────────────────────────────
 function Tip({ children, text }) {
+  const [show, setShow] = React.useState(false);
+  const [pos, setPos] = React.useState({ top: 0, left: 0, below: false });
+  const ref = React.useRef(null);
+
+  const handleEnter = () => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const tipW = Math.min(320, text.length * 6.5 + 24);
+    let left = rect.left + rect.width / 2;
+    let top = rect.top - 8;
+    let below = false;
+
+    // If too close to top, show below instead
+    if (top < 60) {
+      top = rect.bottom + 8;
+      below = true;
+    }
+    // Keep horizontal within viewport
+    if (left - tipW / 2 < 8) left = tipW / 2 + 8;
+    if (left + tipW / 2 > window.innerWidth - 8) left = window.innerWidth - tipW / 2 - 8;
+
+    setPos({ top, left, below });
+    setShow(true);
+  };
+
+  const handleLeave = () => setShow(false);
+
   return (
-    <span className="tip">
+    <span className="tip" ref={ref} onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
       {children}
-      <span className="tip-text">{text}</span>
+      {show && ReactDOM.createPortal(
+        <div className={`tip-float ${pos.below ? 'below' : ''}`}
+          style={{
+            top: pos.below ? pos.top : undefined,
+            bottom: pos.below ? undefined : (window.innerHeight - pos.top),
+            left: pos.left,
+            transform: 'translateX(-50%)',
+          }}>
+          {text}
+        </div>,
+        document.body
+      )}
     </span>
   );
 }
