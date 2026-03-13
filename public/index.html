@@ -689,6 +689,109 @@
       background: #FF264D; color: white;
       animation: alertPulse 1.5s ease-in-out infinite;
     }
+
+    /* ── Tooltip (inline, hover-activated) ── */
+    .tip {
+      position: relative;
+      cursor: help;
+      border-bottom: 1px dotted var(--text-muted);
+    }
+    .tip .tip-text {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 12px;
+      background: #173360;
+      color: #fff;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 400;
+      line-height: 1.5;
+      white-space: normal;
+      width: max-content;
+      max-width: 320px;
+      z-index: 200;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      font-family: var(--font-sans);
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .tip .tip-text::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 5px solid transparent;
+      border-top-color: #173360;
+    }
+    .tip:hover .tip-text { display: block; }
+    /* For table headers — no underline variant */
+    th .tip { border-bottom: none; }
+
+    /* ── Definitions Tab ── */
+    .def-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    @media (max-width: 900px) { .def-grid { grid-template-columns: 1fr; } }
+    .def-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .def-card-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .def-card p, .def-card li {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+    .def-card ul {
+      margin: 4px 0 0 16px;
+      padding: 0;
+    }
+    .def-card code {
+      background: var(--accent-purple-soft);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--accent-purple);
+    }
+    .legend-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .legend-table th {
+      text-align: left;
+      font-size: 11px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding: 6px 8px;
+      border-bottom: 2px solid var(--border);
+      letter-spacing: 0.5px;
+    }
+    .legend-table td {
+      padding: 8px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .legend-table tr:last-child td { border-bottom: none; }
   </style>
 </head>
 <body>
@@ -776,6 +879,16 @@ function formatDateCT(date) {
     timeZone: 'America/Chicago',
     month: 'short', day: 'numeric', year: 'numeric',
   });
+}
+
+// ── Tooltip Component ────────────────────────────────────────
+function Tip({ children, text }) {
+  return (
+    <span className="tip">
+      {children}
+      <span className="tip-text">{text}</span>
+    </span>
+  );
 }
 
 // ── Demo Data Generator ──────────────────────────────────────
@@ -1112,6 +1225,9 @@ function App() {
         <button className={`tab-btn ${activeTab === 'recap' ? 'active' : ''}`} onClick={() => setActiveTab('recap')}>
           Recap
         </button>
+        <button className={`tab-btn ${activeTab === 'definitions' ? 'active' : ''}`} onClick={() => setActiveTab('definitions')}>
+          📖 Definitions
+        </button>
       </nav>
 
       {/* Content */}
@@ -1147,6 +1263,7 @@ function App() {
         {activeTab === 'team' && <TeamView tickets={tickets} stats={stats} />}
         {activeTab === 'analytics' && <AnalyticsView tickets={tickets} stats={stats} />}
         {activeTab === 'recap' && <RecapView tickets={tickets} stats={stats} />}
+        {activeTab === 'definitions' && <DefinitionsView />}
       </div>
     </div>
   );
@@ -1164,37 +1281,37 @@ function QueueView({
       {/* Stats Row */}
       <div className="stats-row">
         <div className="stat-card">
-          <div className="stat-label">Open Backlog</div>
+          <div className="stat-label"><Tip text="Total open tickets across PSS, MCQM, FHPS, and OAC that haven't been resolved yet.">Open Backlog</Tip></div>
           <div className="stat-value" style={{color: 'var(--accent-blue)'}}>{stats.open}</div>
           <div className="stat-sub">across all projects</div>
         </div>
         <div className={`stat-card ${stats.reopened > 0 ? 'alert' : ''}`}>
-          <div className="stat-label">Reopened</div>
+          <div className="stat-label"><Tip text="Tickets that were previously resolved/closed but transitioned back to an open status. Only counts transitions FROM final statuses (Done, Closed, Resolved, Cancelled).">Reopened</Tip></div>
           <div className="stat-value" style={{color: stats.reopened > 0 ? 'var(--accent-red)' : 'var(--text-primary)'}}>{stats.reopened}</div>
           <div className="stat-sub">need attention</div>
         </div>
         <div className={`stat-card ${stats.stagnant > 5 ? 'warn' : ''}`}>
-          <div className="stat-label">Stagnant (24h+)</div>
+          <div className="stat-label"><Tip text="Tickets with no update (status change, comment, or edit) for more than 24 hours. These may be stuck or forgotten.">Stagnant (24h+)</Tip></div>
           <div className="stat-value" style={{color: stats.stagnant > 0 ? 'var(--accent-orange)' : 'var(--text-primary)'}}>{stats.stagnant}</div>
           <div className="stat-sub">no update 24h+</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Waiting for Response</div>
+          <div className="stat-label"><Tip text="Tickets where the most recent comment was from our internal team — we're waiting on the partner/customer to respond.">Waiting for Response</Tip></div>
           <div className="stat-value" style={{color: 'var(--accent-purple)'}}>{stats.waiting}</div>
           <div className="stat-sub">ball in their court</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Whoop (PSS)</div>
+          <div className="stat-label"><Tip text="PSS tickets tagged with the Whoop label, component, or containing 'Whoop' in the summary. Whoop is a dedicated partner queue.">Whoop (PSS)</Tip></div>
           <div className="stat-value" style={{color: 'var(--accent-cyan)'}}>{stats.whoop}</div>
           <div className="stat-sub">active Whoop tickets</div>
         </div>
         <div className={`stat-card ${stats.slaBreaches > 0 ? 'alert' : ''}`}>
-          <div className="stat-label">SLA Breaches</div>
+          <div className="stat-label"><Tip text="Tickets where the first external reply exceeded the SLA threshold: 4 hours for all partners, 120 minutes for FHPS. FHPS breaches incur a $200 penalty each.">SLA Breaches</Tip></div>
           <div className="stat-value" style={{color: stats.slaBreaches > 0 ? 'var(--accent-red)' : 'var(--text-primary)'}}>{stats.slaBreaches}</div>
           <div className="stat-sub">{stats.fhpsPenalties > 0 ? `$${stats.fhpsPenalties} FHPS penalties` : 'first reply > threshold'}</div>
         </div>
         <div className={`stat-card ${stats.chronicReopens > 0 ? 'alert' : ''}`}>
-          <div className="stat-label">Chronic Reopens</div>
+          <div className="stat-label"><Tip text="Tickets reopened 4 or more times within the last 72 hours. Indicates an unresolved root cause — requires immediate lead intervention.">Chronic Reopens</Tip></div>
           <div className="stat-value" style={{color: stats.chronicReopens > 0 ? 'var(--accent-red)' : 'var(--text-primary)'}}>{stats.chronicReopens}</div>
           <div className="stat-sub">4+ reopens in 72h</div>
         </div>
@@ -1293,18 +1410,18 @@ function QueueView({
       <table className="ticket-table">
         <thead>
           <tr>
-            <th onClick={() => handleSort('priority')}>Priority{sortIndicator('priority')}</th>
-            <th onClick={() => handleSort('key')}>Key{sortIndicator('key')}</th>
-            <th onClick={() => handleSort('project')}>Proj{sortIndicator('project')}</th>
+            <th onClick={() => handleSort('priority')}><Tip text="Jira priority level (Highest → Lowest). Click to sort.">Priority{sortIndicator('priority')}</Tip></th>
+            <th onClick={() => handleSort('key')}><Tip text="Jira issue key (e.g. PSS-1234). Click to sort.">Key{sortIndicator('key')}</Tip></th>
+            <th onClick={() => handleSort('project')}><Tip text="Jira project: PSS, MCQM, FHPS, or OAC. Click to sort.">Proj{sortIndicator('project')}</Tip></th>
             <th>Summary</th>
-            <th onClick={() => handleSort('status')}>Status{sortIndicator('status')}</th>
-            <th onClick={() => handleSort('assignee')}>Assignee{sortIndicator('assignee')}</th>
-            <th onClick={() => handleSort('created')}>Created{sortIndicator('created')}</th>
-            <th onClick={() => handleSort('totalAge')}>Total Age{sortIndicator('totalAge')}</th>
-            <th onClick={() => handleSort('age')}>Last Update{sortIndicator('age')}</th>
-            <th onClick={() => handleSort('comments')}>Cmts{sortIndicator('comments')}</th>
-            <th onClick={() => handleSort('sla')}>SLA{sortIndicator('sla')}</th>
-            <th>Flags</th>
+            <th onClick={() => handleSort('status')}><Tip text="Current Jira workflow status. Click to sort alphabetically.">Status{sortIndicator('status')}</Tip></th>
+            <th onClick={() => handleSort('assignee')}><Tip text="Person assigned to this ticket. Click to sort.">Assignee{sortIndicator('assignee')}</Tip></th>
+            <th onClick={() => handleSort('created')}><Tip text="When the ticket was originally created in Jira. Click to sort oldest-first.">Created{sortIndicator('created')}</Tip></th>
+            <th onClick={() => handleSort('totalAge')}><Tip text="Total time since ticket creation — how long this issue has existed. Click to sort.">Total Age{sortIndicator('totalAge')}</Tip></th>
+            <th onClick={() => handleSort('age')}><Tip text="Time since the last update (status change, comment, or edit). Click to sort.">Last Update{sortIndicator('age')}</Tip></th>
+            <th onClick={() => handleSort('comments')}><Tip text="Total comment count on this ticket. Orange = 6+ comments (high volume). Click to sort.">Cmts{sortIndicator('comments')}</Tip></th>
+            <th onClick={() => handleSort('sla')}><Tip text="SLA status: time to first external reply. Threshold: 4h general, 2h FHPS. BREACH = exceeded. Click to sort breaches first.">SLA{sortIndicator('sla')}</Tip></th>
+            <th><Tip text="Flag badges: WHOOP, REOPEN, CHRONIC, SLA BREACH, $200 penalty, comment volume, STAGNANT, ⏳ waiting.">Flags</Tip></th>
           </tr>
         </thead>
         <tbody>
@@ -1406,33 +1523,33 @@ function AlertsView({ tickets, stats }) {
     <div>
       <div className="stats-row">
         <div className={`stat-card ${chronicReopens.length > 0 ? 'alert' : ''}`}>
-          <div className="stat-label">Chronic Reopens</div>
+          <div className="stat-label"><Tip text="Tickets reopened 4+ times within a rolling 72-hour window. Indicates unresolved root causes needing lead intervention.">Chronic Reopens</Tip></div>
           <div className="stat-value" style={{color: chronicReopens.length > 0 ? 'var(--accent-red)' : 'var(--text-primary)'}}>{chronicReopens.length}</div>
           <div className="stat-sub">4+ in 72h</div>
         </div>
         <div className={`stat-card ${slaBreached.length > 0 ? 'alert' : ''}`}>
-          <div className="stat-label">SLA Breaches</div>
+          <div className="stat-label"><Tip text="Tickets where first external reply exceeded the SLA threshold. FHPS = 2 hours ($200 penalty each), all others = 4 hours.">SLA Breaches</Tip></div>
           <div className="stat-value" style={{color: slaBreached.length > 0 ? 'var(--accent-red)' : 'var(--text-primary)'}}>{slaBreached.length}</div>
           <div className="stat-sub">{fhpsPenaltyTotal > 0 ? `$${fhpsPenaltyTotal} penalties` : 'first reply overdue'}</div>
         </div>
         <div className={`stat-card ${reopened.length > 0 ? 'alert' : ''}`}>
-          <div className="stat-label">Reopened Tickets</div>
+          <div className="stat-label"><Tip text="Tickets that transitioned from a final status (Done, Closed, Resolved, etc.) back to an active status at least once.">Reopened Tickets</Tip></div>
           <div className="stat-value" style={{color: 'var(--accent-red)'}}>{reopened.length}</div>
         </div>
         <div className={`stat-card ${highCommentTickets.length > 0 ? 'warn' : ''}`}>
-          <div className="stat-label">High Comments (6+)</div>
+          <div className="stat-label"><Tip text="Tickets with 6+ total comments (internal + external). High volume often signals unresolved issues or customer frustration.">High Comments (6+)</Tip></div>
           <div className="stat-value" style={{color: highCommentTickets.length > 0 ? 'var(--accent-orange)' : 'var(--text-primary)'}}>{highCommentTickets.length}</div>
         </div>
         <div className={`stat-card ${stagnant.length > 5 ? 'warn' : ''}`}>
-          <div className="stat-label">Stagnant (24h+)</div>
+          <div className="stat-label"><Tip text="Open tickets with no update (comment, status change, or field edit) for 24+ hours.">Stagnant (24h+)</Tip></div>
           <div className="stat-value" style={{color: 'var(--accent-orange)'}}>{stagnant.length}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Unassigned</div>
+          <div className="stat-label"><Tip text="Tickets currently without an assigned agent. These need immediate triage and ownership.">Unassigned</Tip></div>
           <div className="stat-value" style={{color: 'var(--accent-purple)'}}>{unassigned.length}</div>
         </div>
         <div className={`stat-card ${highPriStagnant.length > 0 ? 'alert' : ''}`}>
-          <div className="stat-label">High Pri + Stagnant</div>
+          <div className="stat-label"><Tip text="Highest/High/Critical priority tickets that are also stagnant (24h+ without update). Urgent action required.">High Pri + Stagnant</Tip></div>
           <div className="stat-value" style={{color: 'var(--accent-red)'}}>{highPriStagnant.length}</div>
         </div>
       </div>
@@ -1462,7 +1579,7 @@ function AlertsView({ tickets, stats }) {
 
       {/* SLA Breach Section */}
       <div className="section-header">
-        ⏱ SLA Breaches <span className="count">({slaBreached.length})</span>
+        <Tip text="First external reply time exceeded: 2h for FHPS ($200 penalty each), 4h for PSS/MCQM/OAC. Includes tickets still awaiting any reply.">⏱ SLA Breaches</Tip> <span className="count">({slaBreached.length})</span>
         {fhpsPenaltyTotal > 0 && (
           <span style={{marginLeft: 12, color: 'var(--accent-red)', fontWeight: 700, fontSize: 14}}>
             💰 ${fhpsPenaltyTotal} in FHPS penalties
@@ -1512,7 +1629,7 @@ function AlertsView({ tickets, stats }) {
 
       {/* High Comment Volume Section */}
       <div className="section-header">
-        💬 High Comment Volume (6+) <span className="count">({highCommentTickets.length})</span>
+        <Tip text="Tickets with 6+ comments suggest prolonged back-and-forth. Review for scope creep, miscommunication, or unresolved root causes.">💬 High Comment Volume (6+)</Tip> <span className="count">({highCommentTickets.length})</span>
       </div>
       {highCommentTickets.length === 0 ? (
         <p style={{color: 'var(--text-muted)', marginBottom: 20}}>No tickets with excessive comment volume.</p>
@@ -1546,7 +1663,7 @@ function AlertsView({ tickets, stats }) {
 
       {/* Reopened Section */}
       <div className="section-header">
-        🔴 Reopened Tickets <span className="count">({reopened.length})</span>
+        <Tip text="Tickets that moved from Done/Closed/Resolved back to an active status. Tracked via changelog transitions, not current status name.">🔴 Reopened Tickets</Tip> <span className="count">({reopened.length})</span>
       </div>
       {reopened.length === 0 ? (
         <p style={{color: 'var(--text-muted)', marginBottom: 20}}>No reopened tickets. Clean slate.</p>
@@ -1579,7 +1696,7 @@ function AlertsView({ tickets, stats }) {
 
       {/* Stagnant Section */}
       <div className="section-header">
-        ⏰ Stagnant Tickets (No Update 24h+) <span className="count">({stagnant.length})</span>
+        <Tip text="No update of any kind (comment, status change, field edit) for 24+ hours. Sorted by longest silence first.">⏰ Stagnant Tickets (No Update 24h+)</Tip> <span className="count">({stagnant.length})</span>
       </div>
       {stagnant.length === 0 ? (
         <p style={{color: 'var(--text-muted)', marginBottom: 20}}>All tickets have been touched within 24 hours.</p>
@@ -1609,7 +1726,7 @@ function AlertsView({ tickets, stats }) {
 
       {/* Unassigned */}
       <div className="section-header">
-        👤 Unassigned Tickets <span className="count">({unassigned.length})</span>
+        <Tip text="Tickets with no assignee. Need immediate triage — someone must own each ticket for accountability.">👤 Unassigned Tickets</Tip> <span className="count">({unassigned.length})</span>
       </div>
       {unassigned.length === 0 ? (
         <p style={{color: 'var(--text-muted)'}}>All tickets are assigned.</p>
@@ -2153,6 +2270,319 @@ function RecapView({ tickets, stats }) {
 
       <div className="section-header" style={{fontSize: 13}}>Plain Text Format</div>
       <div className="recap-box">{recap}</div>
+    </div>
+  );
+}
+
+// ── Definitions View ─────────────────────────────────────────
+function DefinitionsView() {
+  return (
+    <div>
+      <div className="section-header">📖 Definitions & Measurement Guide</div>
+      <p style={{color: 'var(--text-secondary)', fontSize: 13, marginBottom: 20, lineHeight: 1.7}}>
+        This page explains every metric, flag, badge, and threshold used across the CX Workbench.
+        Hover over any stat card or column header on other tabs for a quick summary.
+      </p>
+
+      {/* ── SLA Section ── */}
+      <div className="section-header" style={{fontSize: 15}}>⏱ SLA (Service Level Agreement)</div>
+      <div className="def-grid">
+        <div className="def-card">
+          <div className="def-card-title">⏱ First External Reply Time</div>
+          <p>
+            Measured from ticket creation to the first <strong>non-internal</strong> comment
+            (i.e., a comment visible to the partner/customer). Internal notes don't count.
+          </p>
+          <ul>
+            <li><strong>All partners:</strong> first reply must be within <code>4 hours</code></li>
+            <li><strong>FHPS only:</strong> first reply must be within <code>120 minutes (2 hours)</code></li>
+          </ul>
+        </div>
+        <div className="def-card">
+          <div className="def-card-title">🚨 SLA Breach</div>
+          <p>
+            A ticket is in <strong>SLA breach</strong> when the first external reply took longer
+            than the threshold — or when no external reply has been sent yet and the ticket is
+            older than the threshold.
+          </p>
+          <ul>
+            <li>Breached tickets show a red <span className="tag-sla-breach">SLA BREACH</span> badge</li>
+            <li>Tickets still awaiting reply show <span style={{fontSize: 10, color: 'var(--accent-orange)'}}>⏳ awaiting</span></li>
+            <li>Compliant tickets show a green <span className="tag-sla-ok">✓ Xh</span> badge with the reply time</li>
+          </ul>
+        </div>
+        <div className="def-card">
+          <div className="def-card-title">💰 FHPS Penalty ($200)</div>
+          <p>
+            Each FHPS ticket where the first external reply exceeds 120 minutes incurs a
+            <strong> $200 contractual penalty</strong>. The total penalty amount is shown in the
+            Alerts tab and in the stat card.
+          </p>
+          <p style={{marginTop: 6}}>
+            <span className="tag-penalty">$200</span> badge appears on affected tickets.
+          </p>
+        </div>
+        <div className="def-card">
+          <div className="def-card-title">📊 SLA Column (Queue Table)</div>
+          <p>
+            The SLA column shows one of three states:
+          </p>
+          <ul>
+            <li><span className="tag-sla-breach">BREACH 5h</span> — replied at 5h, threshold was 4h</li>
+            <li><span className="tag-sla-breach">BREACH NO REPLY</span> — no external reply sent, past threshold</li>
+            <li><span className="tag-sla-ok">1.2h</span> — replied within threshold</li>
+            <li><span style={{fontSize: 10, color: 'var(--accent-orange)'}}>⏳ awaiting</span> — no reply yet, still within threshold</li>
+          </ul>
+        </div>
+      </div>
+
+      <div className="section-divider" />
+
+      {/* ── Reopen Section ── */}
+      <div className="section-header" style={{fontSize: 15}}>🔄 Reopen Tracking</div>
+      <div className="def-grid">
+        <div className="def-card">
+          <div className="def-card-title">🔴 True Reopen</div>
+          <p>
+            A ticket is only counted as "reopened" when it transitions <strong>FROM</strong> a
+            final/resolved status <strong>TO</strong> a non-final status. This prevents false
+            positives from normal workflow movements.
+          </p>
+          <p style={{marginTop: 6}}><strong>Final statuses recognized:</strong></p>
+          <ul>
+            <li><code>Done</code>, <code>Closed</code>, <code>Resolved</code></li>
+            <li><code>Cancelled</code>, <code>Declined</code>, <code>Won't Do</code></li>
+          </ul>
+          <p style={{marginTop: 6}}>
+            Example: "In Progress → Done → Reopened" counts as 1 reopen.
+            "Open → In Progress" does <em>not</em> count.
+          </p>
+        </div>
+        <div className="def-card">
+          <div className="def-card-title">🔥 Chronic Reopen</div>
+          <p>
+            A ticket is flagged as <strong>chronic</strong> when it has been reopened
+            <strong> 4 or more times within the last 72 hours</strong>. This signals a
+            systemic issue — the root cause isn't being addressed.
+          </p>
+          <ul>
+            <li>Triggers a pulsing red banner on both the Queue and Alerts tabs</li>
+            <li>Shows <span className="tag-chronic">🔥 CHRONIC x4</span> badge</li>
+            <li>Requires immediate lead intervention</li>
+          </ul>
+        </div>
+        <div className="def-card">
+          <div className="def-card-title">📈 Reopen Count vs. 72h Count</div>
+          <p>
+            <strong>Reopen Count (total)</strong> = lifetime count of all reopen transitions
+            on this ticket, regardless of when they happened.
+          </p>
+          <p style={{marginTop: 6}}>
+            <strong>Reopens in 72h</strong> = only reopens that occurred in the last 3 days.
+            This windowed count drives the chronic reopen alert.
+          </p>
+        </div>
+      </div>
+
+      <div className="section-divider" />
+
+      {/* ── Comment Volume ── */}
+      <div className="section-header" style={{fontSize: 15}}>💬 Comment Volume</div>
+      <div className="def-grid">
+        <div className="def-card">
+          <div className="def-card-title">💬 High Comment Volume (6+)</div>
+          <p>
+            Tickets with <strong>more than 6 comments</strong> are flagged as high-volume.
+            This often indicates back-and-forth that hasn't resolved the issue, or
+            escalation/complexity.
+          </p>
+          <ul>
+            <li>Comment count turns <strong style={{color: 'var(--accent-orange)'}}>orange and bold</strong> in the Cmts column</li>
+            <li>Shows <span className="tag-high-comments">💬 8</span> badge in the Flags column</li>
+            <li>Dedicated section in the Alerts tab breaks down internal vs. external comments</li>
+          </ul>
+        </div>
+        <div className="def-card">
+          <div className="def-card-title">🔍 Internal vs. External Comments</div>
+          <p>
+            <strong>Internal:</strong> Comments marked as internal notes or with role-based
+            visibility in Jira Service Desk (<code>jsdPublic = false</code>). Not visible to the customer.
+          </p>
+          <p style={{marginTop: 6}}>
+            <strong>External:</strong> Public comments visible to the partner/customer.
+            The first external comment is what defines the SLA first-reply time.
+          </p>
+        </div>
+      </div>
+
+      <div className="section-divider" />
+
+      {/* ── Other Metrics ── */}
+      <div className="section-header" style={{fontSize: 15}}>📏 Other Metrics</div>
+      <div className="def-grid">
+        <div className="def-card">
+          <div className="def-card-title">⏰ Stagnant (24h+)</div>
+          <p>
+            A ticket is <strong>stagnant</strong> when its <code>updated</code> timestamp
+            in Jira is more than 24 hours old. Any status change, comment, or field edit
+            resets this timer.
+          </p>
+        </div>
+        <div className="def-card">
+          <div className="def-card-title">⏳ Waiting for Response</div>
+          <p>
+            The most recent comment on this ticket was from our <strong>internal team</strong>.
+            We're waiting on the partner/customer to reply. The ball is in their court.
+          </p>
+        </div>
+        <div className="def-card">
+          <div className="def-card-title">📅 Total Age vs. Last Update</div>
+          <p>
+            <strong>Total Age:</strong> Time since the ticket was <em>created</em> in Jira.
+            Shows how long this issue has existed.
+          </p>
+          <p style={{marginTop: 6}}>
+            <strong>Last Update:</strong> Time since the ticket was last <em>modified</em>
+            (any field change, comment, or transition). Shows how long since anyone touched it.
+          </p>
+        </div>
+        <div className="def-card">
+          <div className="def-card-title">🏷 Projects</div>
+          <p>Four Jira projects are tracked:</p>
+          <ul>
+            <li><code>PSS</code> — Partner Support Services</li>
+            <li><code>MCQM</code> — Patient Support Services</li>
+            <li><code>FHPS</code> — FHPS (120min SLA, $200 penalty)</li>
+            <li><code>OAC</code> — OAC</li>
+          </ul>
+        </div>
+      </div>
+
+      <div className="section-divider" />
+
+      {/* ── Badge/Flag Legend ── */}
+      <div className="section-header" style={{fontSize: 15}}>🏷 Badge & Flag Legend</div>
+      <div className="def-card" style={{marginBottom: 24}}>
+        <table className="legend-table">
+          <thead>
+            <tr>
+              <th>Badge</th>
+              <th>Name</th>
+              <th>What It Means</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span className="tag-whoop">WHOOP</span></td>
+              <td>Whoop Partner</td>
+              <td>PSS ticket tagged with Whoop label, component, or summary text.</td>
+            </tr>
+            <tr>
+              <td><span className="tag-reopen">REOPEN x3</span></td>
+              <td>Reopened</td>
+              <td>Ticket has been reopened X times total (transitions from final → open status).</td>
+            </tr>
+            <tr>
+              <td><span className="tag-chronic">🔥 CHRONIC x4</span></td>
+              <td>Chronic Reopen</td>
+              <td>Reopened 4+ times within the last 72 hours. Pulsing animation = urgent.</td>
+            </tr>
+            <tr>
+              <td><span className="tag-sla-breach">SLA BREACH</span></td>
+              <td>SLA Breach</td>
+              <td>First external reply exceeded the SLA threshold (4h general, 2h FHPS).</td>
+            </tr>
+            <tr>
+              <td><span className="tag-sla-ok">1.2h</span></td>
+              <td>SLA Met</td>
+              <td>First external reply was sent within the SLA threshold.</td>
+            </tr>
+            <tr>
+              <td><span className="tag-penalty">$200</span></td>
+              <td>FHPS Penalty</td>
+              <td>Contractual penalty for FHPS SLA breach. $200 per breached ticket.</td>
+            </tr>
+            <tr>
+              <td><span className="tag-high-comments">💬 8</span></td>
+              <td>High Comments</td>
+              <td>Ticket has more than 6 comments — indicates back-and-forth or complexity.</td>
+            </tr>
+            <tr>
+              <td><span className="tag-stagnant">STAGNANT</span></td>
+              <td>Stagnant</td>
+              <td>No update for 24+ hours. May be stuck or forgotten.</td>
+            </tr>
+            <tr>
+              <td><span style={{fontSize: 10, color: 'var(--accent-purple)'}}>⏳</span></td>
+              <td>Waiting</td>
+              <td>Last comment was internal — waiting for partner/customer response.</td>
+            </tr>
+            <tr>
+              <td><span style={{fontSize: 10, color: 'var(--accent-orange)'}}>⏳ awaiting</span></td>
+              <td>Awaiting 1st Reply</td>
+              <td>No external reply has been sent yet, but SLA hasn't been breached yet.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div className="section-divider" />
+
+      {/* ── Sorting Guide ── */}
+      <div className="section-header" style={{fontSize: 15}}>🔀 Sorting & Filtering</div>
+      <div className="def-grid">
+        <div className="def-card">
+          <div className="def-card-title">📊 Sortable Columns</div>
+          <p>Click any column header to sort. Click again to reverse direction (↑ asc / ↓ desc).</p>
+          <ul>
+            <li><strong>Priority:</strong> Highest → Lowest (ties broken by created date)</li>
+            <li><strong>Key:</strong> Alphabetical by Jira key</li>
+            <li><strong>Project:</strong> Alphabetical by project code</li>
+            <li><strong>Status:</strong> Alphabetical by status name</li>
+            <li><strong>Assignee:</strong> Alphabetical by name</li>
+            <li><strong>Created:</strong> Oldest first (asc) or newest first (desc)</li>
+            <li><strong>Total Age:</strong> Longest-lived tickets first</li>
+            <li><strong>Last Update:</strong> Most stagnant first</li>
+            <li><strong>Comments:</strong> Most comments first</li>
+            <li><strong>SLA:</strong> Breaches first, then by reply time</li>
+          </ul>
+        </div>
+        <div className="def-card">
+          <div className="def-card-title">🔍 Filter Options</div>
+          <p>Use the filter bar to narrow the queue:</p>
+          <ul>
+            <li><strong>Project buttons:</strong> PSS, MCQM, FHPS, OAC, or All</li>
+            <li><strong>Whoop toggle:</strong> Show only Whoop-tagged tickets</li>
+            <li><strong>Assignee dropdown:</strong> Filter to a single team member</li>
+            <li><strong>Status dropdown:</strong> Filter by Jira status, or special filters:</li>
+            <li style={{marginLeft: 16}}>⚠ Reopened — any ticket with reopen count &gt; 0</li>
+            <li style={{marginLeft: 16}}>⏰ Stagnant — no update for 24+ hours</li>
+            <li style={{marginLeft: 16}}>⏳ Waiting — last comment was internal</li>
+            <li style={{marginLeft: 16}}>🚨 SLA Breach — first reply exceeded threshold</li>
+            <li style={{marginLeft: 16}}>💬 6+ Comments — high comment volume</li>
+            <li style={{marginLeft: 16}}>🔥 Chronic Reopen — 4+ reopens in 72h</li>
+            <li><strong>Search box:</strong> Free-text search across key, summary, and assignee</li>
+          </ul>
+        </div>
+      </div>
+
+      <div className="section-divider" />
+
+      {/* ── Data Sources ── */}
+      <div className="section-header" style={{fontSize: 15}}>🔌 Data Sources & Refresh</div>
+      <div className="def-card" style={{marginBottom: 24}}>
+        <p>
+          All data is fetched live from <strong>Jira Cloud</strong> via a Netlify serverless
+          function (<code>jira-proxy</code>). The function queries four projects
+          (PSS, MCQM, FHPS, OAC) and returns all open tickets with full changelog history.
+        </p>
+        <ul>
+          <li><strong>Auto-refresh:</strong> every 60 seconds</li>
+          <li><strong>Manual refresh:</strong> click "Refresh" in the header</li>
+          <li><strong>Changelog:</strong> includes all status transitions, comment metadata, and assignee changes</li>
+          <li><strong>Demo mode:</strong> if the Jira API is unavailable, the app falls back to synthetic demo data</li>
+        </ul>
+      </div>
     </div>
   );
 }
