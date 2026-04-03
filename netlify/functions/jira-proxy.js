@@ -144,13 +144,31 @@ async function getStats() {
   };
 }
 
-// ── Route: /history  -  last 30 days for charts ──────────────
-async function getHistory() {
-  const jql = `project in (PSS, MCQM, FHPS, OAC) AND created >= -30d ORDER BY created ASC`;
-  const fields = ['summary','status','priority','assignee','issuetype','created','updated','resolutiondate','labels','components'];
+// ── Route: /history  -  date-range search (default: 30 days, max: 6 months) ──
+async function getHistory(params = {}) {
+  const now = new Date();
+  const sixMonthsAgo = new Date(now); sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  const thirtyDaysAgo = new Date(now); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+  // Parse from/to params, default to last 30 days, cap at 6 months
+  let from = params.from ? new Date(params.from) : thirtyDaysAgo;
+  let to = params.to ? new Date(params.to + 'T23:59:59') : now;
+  if (from < sixMonthsAgo) from = sixMonthsAgo;
+  if (to > now) to = now;
+
+  const fromStr = from.toISOString().split('T')[0];
+  const toStr = to.toISOString().split('T')[0];
+
+  const jql = `project in (PSS, MCQM, FHPS, OAC) AND created >= "${fromStr}" AND created <= "${toStr}" ORDER BY created DESC`;
+  const fields = ['summary','status','priority','assignee','reporter','issuetype','created','updated','resolutiondate','labels','components','customfield_10942'];
+
+  console.log(`[history] Fetching: ${fromStr} to ${toStr}`);
   const allIssues = await jiraSearchAll({ jql, fields });
-  return allIssues.map(i => transformIssue(i));
+  console.log(`[history] Found ${allIssues.length} tickets`);
+  return {
+    tickets: allIssues.map(i => transformIssue(i)),
+    meta: { from: fromStr, to: toStr, total: allIssues.length },
+  };
 }
 
 // ── Transform raw Jira issue to clean object ─────────────────
@@ -269,6 +287,7 @@ function transformIssue(issue) {
     resolved: f.resolutiondate,
     labels: f.labels || [],
     components: (f.components || []).map(c => c.name),
+    partner: (f.customfield_10942 && f.customfield_10942.value) ? f.customfield_10942.value : ((f.components || [])[0]?.name || ''),
     isWhoop,
     commentCount: comments.length,
     internalComments: comments.filter(c => c.isInternal).length,
@@ -331,7 +350,7 @@ exports.handler = async (event) => {
         data = await getStats();
         break;
       case '/history':
-        data = await getHistory();
+        data = await getHistory(event.queryStringParameters || {});
         break;
       default:
         return {

@@ -1323,6 +1323,9 @@ function App() {
         <button className={`tab-btn ${activeTab === 'definitions' ? 'active' : ''}`} onClick={() => setActiveTab('definitions')}>
           📖 Definitions
         </button>
+        <button className={`tab-btn ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
+          🔍 History
+        </button>
       </nav>
 
       {/* Content */}
@@ -1370,6 +1373,7 @@ function App() {
         {activeTab === 'analytics' && <AnalyticsView tickets={filteredTickets} stats={stats} />}
         {activeTab === 'recap' && <RecapView tickets={filteredTickets} stats={stats} />}
         {activeTab === 'definitions' && <DefinitionsView />}
+        {activeTab === 'history' && <HistoryView />}
       </div>
     </div>
   );
@@ -2408,6 +2412,256 @@ function RecapView({ tickets, stats }) {
 
       <div className="section-header" style={{fontSize: 13}}>Plain Text Format</div>
       <div className="recap-box">{recap}</div>
+    </div>
+  );
+}
+
+// ── History View ────────────────────────────────────────────
+function HistoryView() {
+  const [historyData, setHistoryData] = useState(null);
+  const [historyMeta, setHistoryMeta] = useState(null);
+  const [histLoading, setHistLoading] = useState(false);
+  const [histError, setHistError] = useState(null);
+
+  // Date range
+  const today = new Date().toISOString().split('T')[0];
+  const [histFrom, setHistFrom] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().split('T')[0];
+  });
+  const [histTo, setHistTo] = useState(today);
+  const [histPreset, setHistPreset] = useState('30d');
+
+  // Filters
+  const [histSearch, setHistSearch] = useState('');
+  const [histStatus, setHistStatus] = useState('all');
+  const [histProject, setHistProject] = useState('all');
+  const [histSort, setHistSort] = useState('created');
+  const [histSortDir, setHistSortDir] = useState('desc');
+
+  const applyPreset = (preset) => {
+    setHistPreset(preset);
+    const d = new Date();
+    let from;
+    switch (preset) {
+      case '7d': from = new Date(d); from.setDate(from.getDate() - 7); break;
+      case '30d': from = new Date(d); from.setDate(from.getDate() - 30); break;
+      case '90d': from = new Date(d); from.setDate(from.getDate() - 90); break;
+      case '6mo': from = new Date(d); from.setMonth(from.getMonth() - 6); break;
+      default: return; // custom — don't change dates
+    }
+    setHistFrom(from.toISOString().split('T')[0]);
+    setHistTo(today);
+  };
+
+  const fetchHistory = async () => {
+    setHistLoading(true);
+    setHistError(null);
+    try {
+      const res = await fetch(`/api/jira-proxy/history?from=${histFrom}&to=${histTo}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setHistoryData(data.tickets || data);
+      setHistoryMeta(data.meta || { from: histFrom, to: histTo, total: (data.tickets || data).length });
+    } catch (e) {
+      setHistError(e.message);
+      setHistoryData(null);
+    }
+    setHistLoading(false);
+  };
+
+  // Client-side filtering + sorting
+  const filtered = useMemo(() => {
+    if (!historyData) return [];
+    let rows = historyData;
+    if (histStatus !== 'all') {
+      if (histStatus === 'open') rows = rows.filter(t => t.statusCategory !== 'Done');
+      else if (histStatus === 'resolved') rows = rows.filter(t => t.statusCategory === 'Done');
+      else if (histStatus === 'reopened') rows = rows.filter(t => t.status === 'Reopened');
+    }
+    if (histProject !== 'all') rows = rows.filter(t => t.projectKey === histProject);
+    if (histSearch.trim()) {
+      const q = histSearch.toLowerCase().trim();
+      rows = rows.filter(t =>
+        (t.key || '').toLowerCase().includes(q) ||
+        (t.summary || '').toLowerCase().includes(q) ||
+        (t.assignee || '').toLowerCase().includes(q) ||
+        (t.partner || '').toLowerCase().includes(q)
+      );
+    }
+    // Sort
+    rows = [...rows].sort((a, b) => {
+      let cmp = 0;
+      switch (histSort) {
+        case 'key': cmp = (a.key || '').localeCompare(b.key || ''); break;
+        case 'status': cmp = (a.status || '').localeCompare(b.status || ''); break;
+        case 'priority': cmp = (parseInt(a.priorityId) || 5) - (parseInt(b.priorityId) || 5); break;
+        case 'assignee': cmp = (a.assignee || '').localeCompare(b.assignee || ''); break;
+        case 'partner': cmp = (a.partner || '').localeCompare(b.partner || ''); break;
+        case 'created': cmp = new Date(a.created || 0) - new Date(b.created || 0); break;
+        case 'resolved': cmp = new Date(a.resolved || 0) - new Date(b.resolved || 0); break;
+        default: cmp = 0;
+      }
+      return histSortDir === 'desc' ? -cmp : cmp;
+    });
+    return rows;
+  }, [historyData, histStatus, histProject, histSearch, histSort, histSortDir]);
+
+  const toggleSort = (col) => {
+    if (histSort === col) setHistSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setHistSort(col); setHistSortDir('desc'); }
+  };
+  const sortIcon = (col) => histSort === col ? (histSortDir === 'asc' ? ' ▲' : ' ▼') : '';
+
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+  const ageDays = (d) => d ? Math.round((Date.now() - new Date(d)) / 86400000) : null;
+
+  // Status badge colors
+  const statusColor = (s) => {
+    const lc = (s || '').toLowerCase();
+    if (lc.includes('reopen')) return { bg: '#fef2f2', color: '#991b1b', border: '#fecaca' };
+    if (lc.includes('waiting') || lc.includes('pending')) return { bg: '#fffbeb', color: '#92400e', border: '#fde68a' };
+    if (lc === 'done' || lc === 'resolved' || lc === 'closed') return { bg: '#f0fdf4', color: '#166534', border: '#bbf7d0' };
+    if (lc.includes('progress')) return { bg: '#eff6ff', color: '#1e40af', border: '#bfdbfe' };
+    return { bg: '#f8fafc', color: '#475569', border: '#e2e8f0' };
+  };
+
+  return (
+    <div>
+      <div className="section-card" style={{ marginBottom: 16 }}>
+        <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700 }}>🔍 Historical Ticket Search</h3>
+        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>Search all tickets across PSS, MCQM, FHPS, OAC — up to 6 months back, any status.</div>
+
+        {/* Date presets + custom range */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+          {[['7d','7 Days'],['30d','30 Days'],['90d','90 Days'],['6mo','6 Months']].map(([val, label]) => (
+            <button key={val} onClick={() => applyPreset(val)}
+              style={{ padding: '4px 12px', fontSize: 11, fontWeight: histPreset === val ? 700 : 400,
+                border: histPreset === val ? '2px solid #0f766e' : '1px solid #e2e8f0',
+                borderRadius: 4, background: histPreset === val ? '#f0fdfa' : 'white',
+                color: histPreset === val ? '#0f766e' : '#64748b', cursor: 'pointer' }}>
+              {label}
+            </button>
+          ))}
+          <span style={{ color: '#cbd5e1' }}>|</span>
+          <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+            From <input type="date" value={histFrom} onChange={e => { setHistFrom(e.target.value); setHistPreset('custom'); }}
+              style={{ padding: '3px 6px', fontSize: 11, border: '1px solid #e2e8f0', borderRadius: 4 }} />
+          </label>
+          <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+            To <input type="date" value={histTo} onChange={e => { setHistTo(e.target.value); setHistPreset('custom'); }}
+              style={{ padding: '3px 6px', fontSize: 11, border: '1px solid #e2e8f0', borderRadius: 4 }} />
+          </label>
+          <button onClick={fetchHistory} disabled={histLoading}
+            style={{ padding: '5px 16px', fontSize: 12, fontWeight: 700, border: 'none', borderRadius: 4,
+              background: '#0f766e', color: 'white', cursor: histLoading ? 'wait' : 'pointer', opacity: histLoading ? 0.6 : 1 }}>
+            {histLoading ? 'Searching...' : 'Search'}
+          </button>
+        </div>
+
+        {/* Filters row */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <input type="text" value={histSearch} onChange={e => setHistSearch(e.target.value)}
+            placeholder="Search key, summary, assignee, partner..."
+            style={{ padding: '4px 8px', fontSize: 11, border: '1px solid #e2e8f0', borderRadius: 4, width: 240 }} />
+          <select value={histStatus} onChange={e => setHistStatus(e.target.value)}
+            style={{ padding: '4px 8px', fontSize: 11, border: '1px solid #e2e8f0', borderRadius: 4 }}>
+            <option value="all">All Statuses</option>
+            <option value="open">Open</option>
+            <option value="resolved">Resolved / Done</option>
+            <option value="reopened">Reopened</option>
+          </select>
+          <select value={histProject} onChange={e => setHistProject(e.target.value)}
+            style={{ padding: '4px 8px', fontSize: 11, border: '1px solid #e2e8f0', borderRadius: 4 }}>
+            <option value="all">All Projects</option>
+            <option value="PSS">PSS</option>
+            <option value="MCQM">MCQM</option>
+            <option value="FHPS">FHPS</option>
+            <option value="OAC">OAC</option>
+          </select>
+        </div>
+      </div>
+
+      {histError && <div style={{ padding: 12, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, color: '#991b1b', fontSize: 12, marginBottom: 12 }}>{histError}</div>}
+
+      {histLoading && (
+        <div style={{ textAlign: 'center', padding: 40 }}>
+          <div className="spinner" style={{ margin: '0 auto 12px' }}></div>
+          <div style={{ fontSize: 13, color: '#64748b' }}>Searching Jira for tickets from {histFrom} to {histTo}...</div>
+        </div>
+      )}
+
+      {!histLoading && historyData && (
+        <div>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
+            <strong>{filtered.length.toLocaleString()}</strong> tickets shown
+            {historyMeta && <span> ({historyMeta.total.toLocaleString()} total from {fmtDate(historyMeta.from)} – {fmtDate(historyMeta.to)})</span>}
+            {histSearch && <span> — filtered by "{histSearch}"</span>}
+          </div>
+
+          <div className="table-container" style={{ maxHeight: 'calc(100vh - 320px)', overflowY: 'auto' }}>
+            <table className="data-table" style={{ width: '100%', fontSize: 12 }}>
+              <thead style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 2 }}>
+                <tr>
+                  <th style={{ cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => toggleSort('priority')}>P{sortIcon('priority')}</th>
+                  <th style={{ cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => toggleSort('key')}>Key{sortIcon('key')}</th>
+                  <th>Summary</th>
+                  <th style={{ cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => toggleSort('status')}>Status{sortIcon('status')}</th>
+                  <th style={{ cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => toggleSort('partner')}>Partner{sortIcon('partner')}</th>
+                  <th style={{ cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => toggleSort('assignee')}>Assignee{sortIcon('assignee')}</th>
+                  <th style={{ cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => toggleSort('created')}>Created{sortIcon('created')}</th>
+                  <th style={{ cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => toggleSort('resolved')}>Resolved{sortIcon('resolved')}</th>
+                  <th style={{ whiteSpace: 'nowrap' }}>Age</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.slice(0, 2000).map(t => {
+                  const sc = statusColor(t.status);
+                  const age = ageDays(t.created);
+                  return (
+                    <tr key={t.key} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ textAlign: 'center', fontWeight: 600, color: t.priorityId <= 2 ? '#dc2626' : t.priorityId <= 3 ? '#d97706' : '#64748b' }}>
+                        {t.priority === 'Highest' ? '⬆' : t.priority === 'High' ? '↑' : t.priority === 'Low' ? '↓' : t.priority === 'Lowest' ? '⬇' : '•'}
+                      </td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        <a href={t.jiraUrl || `https://steadymd.atlassian.net/browse/${t.key}`} target="_blank" rel="noopener"
+                          style={{ color: '#0f766e', fontWeight: 600, textDecoration: 'none', fontFamily: 'monospace' }}>{t.key}</a>
+                      </td>
+                      <td style={{ maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={t.summary}>{t.summary}</td>
+                      <td>
+                        <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 600,
+                          background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, whiteSpace: 'nowrap' }}>
+                          {t.status}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
+                        {t.partner || <span style={{ color: '#cbd5e1' }}>—</span>}
+                      </td>
+                      <td style={{ fontSize: 11, whiteSpace: 'nowrap', color: t.assignee === 'Unassigned' ? '#d97706' : undefined }}>
+                        {t.assignee}
+                      </td>
+                      <td style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{fmtDate(t.created)}</td>
+                      <td style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{fmtDate(t.resolved)}</td>
+                      <td style={{ fontSize: 11, whiteSpace: 'nowrap', textAlign: 'right', color: age > 30 ? '#dc2626' : age > 7 ? '#d97706' : '#64748b' }}>
+                        {age !== null ? `${age}d` : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {filtered.length > 2000 && <div style={{ padding: 8, fontSize: 11, color: '#64748b', textAlign: 'center' }}>Showing first 2,000 of {filtered.length.toLocaleString()} — use filters to narrow down.</div>}
+          </div>
+        </div>
+      )}
+
+      {!histLoading && !historyData && !histError && (
+        <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>Select a date range and click Search</div>
+          <div style={{ fontSize: 12, marginTop: 4 }}>Queries Jira live — results include all statuses (open, resolved, reopened, etc.)</div>
+        </div>
+      )}
     </div>
   );
 }
