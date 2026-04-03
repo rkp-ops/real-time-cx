@@ -2453,21 +2453,63 @@ function HistoryView() {
     setHistTo(today);
   };
 
+  const [histProgress, setHistProgress] = useState('');
+
   const fetchHistory = async () => {
     setHistLoading(true);
     setHistError(null);
+    setHistoryData(null);
+
     try {
-      const res = await fetch(`/api/jira-proxy/history?from=${histFrom}&to=${histTo}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      setHistoryData(data.tickets || data);
-      setHistoryMeta(data.meta || { from: histFrom, to: histTo, total: (data.tickets || data).length });
+      const from = new Date(histFrom);
+      const to = new Date(histTo + 'T23:59:59');
+      const diffDays = (to - from) / 86400000;
+
+      // For ranges > 45 days, chunk into monthly batches to avoid function timeout
+      if (diffDays > 45) {
+        const allTickets = [];
+        const chunks = [];
+        let chunkStart = new Date(from);
+        while (chunkStart < to) {
+          const chunkEnd = new Date(chunkStart);
+          chunkEnd.setMonth(chunkEnd.getMonth() + 1);
+          if (chunkEnd > to) chunkEnd.setTime(to.getTime());
+          chunks.push({ from: chunkStart.toISOString().split('T')[0], to: chunkEnd.toISOString().split('T')[0] });
+          chunkStart = new Date(chunkEnd);
+          chunkStart.setDate(chunkStart.getDate() + 1);
+        }
+
+        for (let i = 0; i < chunks.length; i++) {
+          const c = chunks[i];
+          setHistProgress(`Fetching chunk ${i + 1} of ${chunks.length} (${c.from} to ${c.to})...`);
+          const res = await fetch(`/api/jira-proxy/history?from=${c.from}&to=${c.to}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status} on chunk ${c.from}-${c.to}`);
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+          const tickets = data.tickets || data;
+          allTickets.push(...(Array.isArray(tickets) ? tickets : []));
+        }
+
+        // Sort combined results by created DESC
+        allTickets.sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0));
+        setHistoryData(allTickets);
+        setHistoryMeta({ from: histFrom, to: histTo, total: allTickets.length });
+      } else {
+        // Small range — single fetch
+        setHistProgress('Searching...');
+        const res = await fetch(`/api/jira-proxy/history?from=${histFrom}&to=${histTo}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        setHistoryData(data.tickets || data);
+        setHistoryMeta(data.meta || { from: histFrom, to: histTo, total: (data.tickets || data).length });
+      }
     } catch (e) {
       setHistError(e.message);
       setHistoryData(null);
     }
     setHistLoading(false);
+    setHistProgress('');
   };
 
   // Client-side filtering + sorting
@@ -2587,7 +2629,7 @@ function HistoryView() {
       {histLoading && (
         <div style={{ textAlign: 'center', padding: 40 }}>
           <div className="spinner" style={{ margin: '0 auto 12px' }}></div>
-          <div style={{ fontSize: 13, color: '#64748b' }}>Searching Jira for tickets from {histFrom} to {histTo}...</div>
+          <div style={{ fontSize: 13, color: '#64748b' }}>{histProgress || `Searching Jira for tickets from ${histFrom} to ${histTo}...`}</div>
         </div>
       )}
 
