@@ -159,12 +159,24 @@ async function getHistory(params = {}) {
   const fromStr = from.toISOString().split('T')[0];
   const toStr = to.toISOString().split('T')[0];
 
-  const jql = `project in (PSS, MCQM, FHPS, OAC) AND created >= "${fromStr}" AND created <= "${toStr}" ORDER BY created DESC`;
   const fields = ['summary','status','priority','assignee','reporter','issuetype','created','updated','resolutiondate','labels','components','customfield_10942'];
 
-  console.log(`[history] Fetching: ${fromStr} to ${toStr}`);
-  const allIssues = await jiraSearchAll({ jql, fields });
-  console.log(`[history] Found ${allIssues.length} tickets`);
+  // Fetch all 4 projects in PARALLEL for speed (avoids function timeout on large ranges)
+  console.log(`[history] Fetching: ${fromStr} to ${toStr} (parallel by project)`);
+  const projects = ['PSS', 'MCQM', 'FHPS', 'OAC'];
+  const results = await Promise.all(projects.map(p =>
+    jiraSearchAll({
+      jql: `project = ${p} AND created >= "${fromStr}" AND created <= "${toStr}" ORDER BY created DESC`,
+      fields,
+    }).then(issues => {
+      console.log(`[history] ${p}: ${issues.length} tickets`);
+      return issues;
+    })
+  ));
+  const allIssues = results.flat();
+  // Sort combined results by created DESC
+  allIssues.sort((a, b) => new Date(b.fields?.created || 0) - new Date(a.fields?.created || 0));
+  console.log(`[history] Total: ${allIssues.length} tickets`);
   return {
     tickets: allIssues.map(i => transformIssue(i)),
     meta: { from: fromStr, to: toStr, total: allIssues.length },
